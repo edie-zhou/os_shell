@@ -1,14 +1,16 @@
-#include <stdio.h>​
-// #include​ <string.h>​
-#include​ <stdlib.h>​
+#include <stdio.h>
+// #include <string.h>
+// #include <stdlib.h>
 
 bool read(char* input[]){
-  char str[2000];
+  len = 2000
+  char str[len];
+  char *p = malloc(sizeof(char) * (len + 1));
 
   printf("# ");
   gets(str);
 
-  return str;
+  return *str;
 }
 
 // void parse(){
