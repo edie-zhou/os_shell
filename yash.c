@@ -107,8 +107,6 @@ void execute(char* input[]){
 
 int main (void){
   const char NEW_LINE = '\n';
-  const char SPACE = ' ';
-  const char YASH_ACTIVE = '#';
   const int MAX_LINE_LEN = 2000;
   const int MAX_TOKEN_LEN = 30;
   int validInput;
@@ -117,8 +115,7 @@ int main (void){
   char* input = (char*)malloc(MAX_LINE_LEN * sizeof(char));
   
   while(shellRunning){
-    printf("%c", YASH_ACTIVE);
-    printf("%c", SPACE);
+    printf("# ");
     validInput = checkInput(input, MAX_LINE_LEN, MAX_TOKEN_LEN);
     
     if(validInput){
@@ -138,4 +135,3 @@ int main (void){
   free(input); 
   return 0;
 }
-
