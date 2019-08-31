@@ -49,7 +49,6 @@ int checkTokens(char input[], int maxLineLen, int maxTokenLen){
  */
 int checkInput(char input[], int maxLineLen, int maxTokenLen){
   const char LINE_FEED = '\n';
-  const char SPACE = ' ';
   char line[maxLineLen];
   if(fgets(line, sizeof line, stdin) != NULL){
     // Check token length
