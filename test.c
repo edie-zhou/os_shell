@@ -47,6 +47,7 @@ int parse (char input[]){
     printf("%c", input[k]);
     k++;
   }
+  return 0;
 }
 
 /**
@@ -68,10 +69,23 @@ int main (void){
   const int MAX_LINE_LEN = 2000;
   int validInput;
   int validParse;
+  int shellRunning = 1;
   char* input = (char*)malloc(MAX_LINE_LEN * sizeof(char));
-  validInput = read(input, MAX_LINE_LEN);
-  validParse = parse(input);
   
+  while(shellRunning){
+    validInput = read(input, MAX_LINE_LEN);
+    validParse = parse(input);
+
+    if(validInput && validParse){
+      printf("%c", 'x');
+      printf("%c", '\n');
+      shellRunning = 1;
+    }
+    else{
+      printf("%c", NEW_LINE);
+    }
+  }
+
   free(input); 
   return 0;
 }
