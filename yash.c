@@ -84,15 +84,22 @@ int checkInput(char input[], int maxLineLen, int maxTokenLen){
 // TODO: Rewrite parse to return a pointer to array of C-strings
 // A linked list could also be a possible solution, but would require more
 // effort
-int parse (char input[]){
+char** parseInput(char input[], int maxTokenLen){
   char delimiters[1] = " ";
-  char* tokenPointer;
-  tokenPointer = strtok (input, delimiters);
-  while (tokenPointer != NULL){
-    printf ("%s\n", tokenPointer);
-    tokenPointer = strtok (NULL, delimiters);
+  int index = 0;
+  int tokenArraySize = maxTokenLen;
+  char** tokenArray = malloc(tokenArraySize * sizeof(char*));
+  char* token = strtok (input, delimiters);
+  tokenArray[index] = token;
+  while(token != NULL){
+    printf ("%s\n", token);
+    index++;
+    tokenArraySize += maxTokenLen;
+    char** tokenArray = realloc(tokenArray, tokenArraySize * sizeof(char*));
+    token = strtok (NULL, delimiters);
+    tokenArray[index] = token;
   }
-  return 1;
+  return tokenArray;
 }
 
 /**
@@ -114,7 +121,6 @@ int main (void){
   const int MAX_LINE_LEN = 2000;
   const int MAX_TOKEN_LEN = 30;
   int validInput;
-  int validParse;
   int shellRunning = 1;
   char* input = (char*)malloc(MAX_LINE_LEN * sizeof(char));
   
@@ -123,12 +129,8 @@ int main (void){
     validInput = checkInput(input, MAX_LINE_LEN, MAX_TOKEN_LEN);
     
     if(validInput){
-      validParse = parse(input);
-    }
-
-    if(validInput && validParse){
-      printf("%c", 'x');
-      printf("%c", '\n');
+      char** tokenArray = parseInput(input, MAX_TOKEN_LEN);
+      printf("%s", "\nexecuted\n");
       shellRunning = 1;
     }
     else{
