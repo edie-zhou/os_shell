@@ -81,12 +81,16 @@ int checkInput(char input[], int maxLineLen, int maxTokenLen){
  *   (int): Returns 1 is string is valid, 0 if string is invalid
  * 
  */
+// TODO: Rewrite parse to return a pointer to array of C-strings
+// A linked list could also be a possible solution, but would require more
+// effort
 int parse (char input[]){
-  int k = 0;
-  const char LINE_FEED = '\n';
-  while(input[k] != LINE_FEED){
-    printf("%c", input[k]);
-    k++;
+  char delimiters[1] = " ";
+  char* tokenPointer;
+  tokenPointer = strtok (input, delimiters);
+  while (tokenPointer != NULL){
+    printf ("%s\n", tokenPointer);
+    tokenPointer = strtok (NULL, delimiters);
   }
   return 1;
 }
