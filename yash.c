@@ -72,6 +72,28 @@ int checkInput(char input[], int maxLineLen, int maxTokenLen){
 
 /**
  * Purpose:
+ *   Count number of tokens in input line
+ * 
+ * Args:
+ *   input (char[]): Pointer to input c-string
+ * 
+ * Returns:
+ *   (int): Number of tokens in input line
+ */
+int countTokens(char input[]){
+  char delimiters[1] = " ";
+  int numTokens = 0;
+  char* token = strtok (input, delimiters);
+  while(token != NULL){
+    // printf ("%s\n", token);
+    numTokens++;
+    token = strtok (NULL, delimiters);
+  }
+  return numTokens;
+} 
+
+/**
+ * Purpose:
  *   Parse input line and check if commands are valid
  * 
  * Args:
@@ -87,15 +109,12 @@ int checkInput(char input[], int maxLineLen, int maxTokenLen){
 char** parseInput(char input[], int maxTokenLen){
   char delimiters[1] = " ";
   int index = 0;
-  int tokenArraySize = maxTokenLen;
-  char** tokenArray = malloc(tokenArraySize * sizeof(char*));
+  int tokenArraySize = countTokens(input);
+  char** tokenArray = (char**) calloc(tokenArraySize+1, sizeof(char*));
   char* token = strtok (input, delimiters);
   tokenArray[index] = token;
   while(token != NULL){
-    printf ("%s\n", token);
     index++;
-    tokenArraySize += maxTokenLen;
-    char** tokenArray = realloc(tokenArray, tokenArraySize * sizeof(char*));
     token = strtok (NULL, delimiters);
     tokenArray[index] = token;
   }
@@ -129,9 +148,13 @@ int main (void){
     validInput = checkInput(input, MAX_LINE_LEN, MAX_TOKEN_LEN);
     
     if(validInput){
+      // char** tokenArray = parseInput(input, MAX_TOKEN_LEN);
+      printf("%d\n", countTokens(input));
       char** tokenArray = parseInput(input, MAX_TOKEN_LEN);
+      printf("%s", tokenArray[0]);
       printf("%s", "\nexecuted\n");
       shellRunning = 1;
+      free(tokenArray);
     }
     else{
       printf("%c", NEW_LINE);
@@ -139,5 +162,6 @@ int main (void){
   }
 
   free(input); 
+  
   return 0;
 }
