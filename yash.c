@@ -82,8 +82,8 @@ int checkInput(char input[], int maxLineLen, int maxTokenLen){
  */
 int countTokens(char input[]){
   char delimiters[1] = " ";
-  int numTokens = 0;
   char* token = strtok (input, delimiters);
+  int numTokens = 1;
   while(token != NULL){
     // printf ("%s\n", token);
     numTokens++;
@@ -100,17 +100,14 @@ int countTokens(char input[]){
  *   input (char[]): Pointer to input c-string
  *  
  * Returns:
- *   (int): Returns 1 is string is valid, 0 if string is invalid
+ *   (char**): Returns array of token c-strings
  * 
  */
-// TODO: Rewrite parse to return a pointer to array of C-strings
-// A linked list could also be a possible solution, but would require more
-// effort
-char** parseInput(char input[], int maxTokenLen){
+char** parseInput(char input[]){
   char delimiters[1] = " ";
   int index = 0;
   int tokenArraySize = countTokens(input);
-  char** tokenArray = (char**) calloc(tokenArraySize+1, sizeof(char*));
+  char** tokenArray = (char**) calloc(tokenArraySize, sizeof(char*));
   char* token = strtok (input, delimiters);
   tokenArray[index] = token;
   while(token != NULL){
@@ -148,11 +145,9 @@ int main (void){
     validInput = checkInput(input, MAX_LINE_LEN, MAX_TOKEN_LEN);
     
     if(validInput){
-      // char** tokenArray = parseInput(input, MAX_TOKEN_LEN);
       printf("%d\n", countTokens(input));
-      char** tokenArray = parseInput(input, MAX_TOKEN_LEN);
-      printf("%s", tokenArray[0]);
-      printf("%s", "\nexecuted\n");
+      char** tokenArray = parseInput(input);
+      printf("%s", "\nexecute\n");
       shellRunning = 1;
       free(tokenArray);
     }
