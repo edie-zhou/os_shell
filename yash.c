@@ -126,7 +126,7 @@ int main (void){
   const char NEW_LINE = '\n';
   const int MAX_LINE_LEN = 2000;
   const int MAX_TOKEN_LEN = 30;
-  int validInput;
+  int validInput = 0;
   char* prompt = "# ";
   char* input;
   
