@@ -86,8 +86,8 @@ int countTokens(char input[]){
   int numTokens = 1;
   while(token != NULL){
     // printf ("%s\n", token);
-    numTokens++;
     token = strtok (NULL, delimiters);
+    numTokens++;
   }
   return numTokens;
 } 
