@@ -71,10 +71,10 @@ int checkInput(char input[], int maxLineLen, int maxTokenLen){
  */
 int countTokens(char input[]){
   char delimiters[1] = " ";
-  char* token = strtok (input, delimiters);
+  char* token = strtok(input, delimiters);
   int numTokens = 1;
   while(token != NULL){
-    token = strtok (NULL, delimiters);
+    token = strtok(NULL, delimiters);
     numTokens++;
   }
   return numTokens;
@@ -92,16 +92,18 @@ int countTokens(char input[]){
  * 
  */
 char** parseInput(char input[]){
-  char delimiters[1] = " ";
+  char delimiter[] = " ";
   int index = 0;
   int tokenArraySize = countTokens(input);
   char** tokenArray = (char**) calloc(tokenArraySize, sizeof(char*));
-  char* token = strtok (input, delimiters);
+  char* token = strtok(input, delimiter);
   tokenArray[index] = token;
   while(token != NULL){
+    printf("BUT\n");
+    printf("%s\n", token);
     index++;
-    token = strtok (NULL, delimiters);
     tokenArray[index] = token;
+    token = strtok(NULL, delimiter);
   }
   return tokenArray;
 }
@@ -120,6 +122,16 @@ void execute(char* input[]){
 
 }
 
+/**
+ * Purpose:
+ *   Driver for shell program
+ * 
+ * Args:
+ *   None
+ * 
+ * Returns:
+ *   (int): 0
+ */
 int main (void){
   const char NEW_LINE = '\n';
   const int MAX_LINE_LEN = 2000;
@@ -130,10 +142,15 @@ int main (void){
   
   while(input = readline(prompt)){
     validInput = checkInput(input, MAX_LINE_LEN, MAX_TOKEN_LEN);
-    printf("\n%d", validInput);
     if(validInput){
       printf("\nTokens: %d\n", countTokens(input));
       char** tokenArray = parseInput(input);
+      // printf("FUCK\n");
+      // int numTokens = countTokens(input);
+      // for(int k = 0; k < numTokens; k++){
+      //   printf("%d %s\n", k, tokenArray[k]);
+      // }
+      // printf("FUCK");
       printf("%s", "\nexecute\n");
       free(tokenArray);
     }
