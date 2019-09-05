@@ -51,26 +51,13 @@ int checkTokens(char input[], int maxLineLen, int maxTokenLen){
  *   (int): Returns 1 if string is valid, 0 if string is invalid
  */
 int checkInput(char input[], int maxLineLen, int maxTokenLen){
-  const char LINE_FEED = '\n';
-  char line[maxLineLen];
-  if(fgets(line, sizeof line, stdin) != NULL){
-    // Check token length
-    if(!checkTokens(line, maxLineLen, maxTokenLen)){
-      return 0;
-    }
-
-    // Write to memory
-    int k = 0;
-    while((line[k] != LINE_FEED) && (k < maxLineLen)){
-      strcpy(input, line);
-      k++;
-    }
-    printf("%c", line[k]);
-    return 1;
-  }
-  else{
+  if(strlen(input) > maxLineLen + 1){
     return 0;
   }
+  if(!checkTokens(input, maxLineLen, maxTokenLen)){
+    return 0;
+  }
+  return 1;
 }
 
 /**
