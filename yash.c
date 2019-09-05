@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <readline/readline.h>
+#include <readline/history.h>
 
-/**
+
+/** 
  * Purpose:
  *   Verify that tokens in input line do not exceed maximum token length
  * 
@@ -16,11 +19,11 @@
  */
 int checkTokens(char input[], int maxLineLen, int maxTokenLen){
   const char LINE_FEED = '\n';
-  const char SPACE = ' ';
+  const char SPACE_CHAR = ' ';
   int tokenLen = 0;
   int k = 0;
   while((input[k] != LINE_FEED) && (k < maxLineLen)){
-    if((tokenLen < 30) && (input[k] == SPACE)){
+    if((tokenLen < 30) && (input[k] == SPACE_CHAR)){
       tokenLen = 0;
     }
     else if(tokenLen >= maxTokenLen){
@@ -137,23 +140,22 @@ int main (void){
   const int MAX_LINE_LEN = 2000;
   const int MAX_TOKEN_LEN = 30;
   int validInput;
-  int shellRunning = 1;
-  char* input = (char*)malloc(MAX_LINE_LEN * sizeof(char));
+  char* prompt = "# ";
+  char* input;
   
-  while(shellRunning){
-    printf("# ");
+  while(input = readline(prompt)){
     validInput = checkInput(input, MAX_LINE_LEN, MAX_TOKEN_LEN);
     
     if(validInput){
       printf("%d\n", countTokens(input));
       char** tokenArray = parseInput(input);
       printf("%s", "\nexecute\n");
-      shellRunning = 1;
       free(tokenArray);
     }
     else{
       printf("%c", NEW_LINE);
     }
+
   }
 
   free(input); 
