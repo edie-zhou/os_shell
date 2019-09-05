@@ -18,11 +18,12 @@
  *   (int): Returns 1 if all tokens are within maximum limit
  */
 int checkTokens(char input[], int maxLineLen, int maxTokenLen){
-  const char LINE_FEED = '\n';
   const char SPACE_CHAR = ' ';
   int tokenLen = 0;
   int k = 0;
-  while((input[k] != LINE_FEED) && (k < maxLineLen)){
+  printf("%s\n", input);
+  while(k < strlen(input)){
+    printf("%dx%cx%d\n", k, input[k], input[k]);
     if((tokenLen < 30) && (input[k] == SPACE_CHAR)){
       tokenLen = 0;
     }
@@ -32,6 +33,7 @@ int checkTokens(char input[], int maxLineLen, int maxTokenLen){
     else{
       tokenLen++;
     }
+    printf("%d", tokenLen);
     k++;
   }
   return 1;
@@ -131,10 +133,16 @@ int main (void){
   char* input;
   
   while(input = readline(prompt)){
+    printf("%ld\n", strlen(input));
+    printf("FUCK\n");
+    for(int k = 0; k< strlen(input); k++){
+      printf("%d %c\n", input[k], input[k]);
+    }
+    printf("FUCK\n");
     validInput = checkInput(input, MAX_LINE_LEN, MAX_TOKEN_LEN);
     
     if(validInput){
-      printf("%d\n", countTokens(input));
+      printf("\nTokens: %d\n", countTokens(input));
       char** tokenArray = parseInput(input);
       printf("%s", "\nexecute\n");
       free(tokenArray);
