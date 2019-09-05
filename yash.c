@@ -123,6 +123,7 @@ char** parseInput(char input[], int numTokens, int maxLineLen, int maxTokenLen){
     tokenArray[index] = arrayEntry;
     }
   }
+  free(inputCopy);
   return tokenArray;
 }
 
@@ -174,8 +175,6 @@ int main (void){
     }
 
   }
-
-  free(input); 
   
   return 0;
 }
