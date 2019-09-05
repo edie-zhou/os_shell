@@ -4,7 +4,6 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
-
 /** 
  * Purpose:
  *   Verify that tokens in input line do not exceed maximum token length
@@ -147,7 +146,7 @@ void execute(char* input[]){
  *   None
  * 
  * Returns:
- *   (int): 0
+ *   (int): 0 on exit success
  */
 int main (void){
   const char NEW_LINE = '\n';
@@ -162,14 +161,14 @@ int main (void){
     validInput = checkInput(input, MAX_LINE_LEN, MAX_TOKEN_LEN);
     if(validInput){
       numTokens = countTokens(input, MAX_LINE_LEN);
-      printf("\nTokens: %d\n", numTokens);
+      // printf("\nTokens: %d\n", numTokens);
       char** tokenArray = parseInput(input, numTokens, MAX_LINE_LEN, MAX_TOKEN_LEN);
-      printf("FUCK\n");
-      for(int k = 0; k < numTokens; k++){
-        printf("%d %s\n", k, tokenArray[k]);
-      }
-      printf("FUCK");
-      printf("%s", "\nexecute\n");
+      // printf("DEBUG\n");
+      // for(int k = 0; k < numTokens; k++){
+      //   printf("%d %s\n", k, tokenArray[k]);
+      // }
+      // printf("DEBUG");
+      // printf("%s", "\nexecute\n");
       free(tokenArray);
     }
     else{
