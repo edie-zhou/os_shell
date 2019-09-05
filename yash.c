@@ -64,19 +64,25 @@ int checkInput(char input[], int maxLineLen, int maxTokenLen){
  *   Count number of tokens in input line
  * 
  * Args:
- *   input (char[]): Pointer to input c-string
+ *   input      (char[]): Pointer to input c-string
+ *   maxLineLen (int): Maximum length of tokens
  * 
  * Returns:
  *   (int): Number of tokens in input line
  */
-int countTokens(char input[]){
-  char delimiters[1] = " ";
-  char* token = strtok(input, delimiters);
+int countTokens(char input[], int maxLineLen){
+  // strtok inserts null terminators in space delimiters
+  char* inputCopy = (char*) malloc(maxLineLen * sizeof(char));
+  strcpy(inputCopy, input);
+
+  char* delimiters = " ";
+  char* token = strtok(inputCopy, delimiters);
   int numTokens = 1;
   while(token != NULL){
     token = strtok(NULL, delimiters);
     numTokens++;
   }
+  free(inputCopy);
   return numTokens;
 } 
 
@@ -85,25 +91,36 @@ int countTokens(char input[]){
  *   Parse input line and check if commands are valid
  * 
  * Args:
- *   input (char[]): Pointer to input c-string
+ *   input       (char[]): Pointer to input c-string
+ *   numTokens   (int): Number of tokens in string
+ *   maxLineLen  (int): Maximum length of input
+ *   maxTokenLen (int): Maximum length of tokens
  *  
  * Returns:
  *   (char**): Returns array of token c-strings
  * 
  */
-char** parseInput(char input[]){
-  char delimiter[] = " ";
+char** parseInput(char input[], int numTokens, int maxLineLen, int maxTokenLen){
+  // strtok inserts null terminators in space delimiters
+  // Remove this copy if input will not be used again
+  char* inputCopy = (char*) malloc(maxLineLen * sizeof(char));
+  strcpy(inputCopy, input);
+  
   int index = 0;
-  int tokenArraySize = countTokens(input);
-  char** tokenArray = (char**) calloc(tokenArraySize, sizeof(char*));
-  char* token = strtok(input, delimiter);
-  tokenArray[index] = token;
+  char* delimiter = " ";
+  char** tokenArray = (char**)calloc(numTokens, sizeof(char*));
+  char* arrayEntry = (char*)malloc(maxTokenLen * sizeof(char));
+  char* token = strtok(inputCopy, delimiter);
+  strcpy(arrayEntry, token);
+  tokenArray[index] = arrayEntry;
   while(token != NULL){
-    printf("BUT\n");
-    printf("%s\n", token);
     index++;
-    tokenArray[index] = token;
     token = strtok(NULL, delimiter);
+    if(token != NULL){
+    char* arrayEntry = (char*)malloc(maxTokenLen * sizeof(char));
+    strcpy(arrayEntry, token);
+    tokenArray[index] = arrayEntry;
+    }
   }
   return tokenArray;
 }
@@ -137,20 +154,21 @@ int main (void){
   const int MAX_LINE_LEN = 2000;
   const int MAX_TOKEN_LEN = 30;
   int validInput = 0;
+  int numTokens = 0;
   char* prompt = "# ";
   char* input;
   
   while(input = readline(prompt)){
     validInput = checkInput(input, MAX_LINE_LEN, MAX_TOKEN_LEN);
     if(validInput){
-      printf("\nTokens: %d\n", countTokens(input));
-      char** tokenArray = parseInput(input);
-      // printf("FUCK\n");
-      // int numTokens = countTokens(input);
-      // for(int k = 0; k < numTokens; k++){
-      //   printf("%d %s\n", k, tokenArray[k]);
-      // }
-      // printf("FUCK");
+      numTokens = countTokens(input, MAX_LINE_LEN);
+      printf("\nTokens: %d\n", numTokens);
+      char** tokenArray = parseInput(input, numTokens, MAX_LINE_LEN, MAX_TOKEN_LEN);
+      printf("FUCK\n");
+      for(int k = 0; k < numTokens; k++){
+        printf("%d %s\n", k, tokenArray[k]);
+      }
+      printf("FUCK");
       printf("%s", "\nexecute\n");
       free(tokenArray);
     }
