@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -128,25 +131,37 @@ char** parseInput(char* input, int numTokens, int maxLineLen, int maxTokenLen){
 
 /**
  * Purpose:
- *   Execute input commands from command line
+ *   Execute general input commands from command line
  * 
  * Args:
- *   tokenArray (char**): Input C-string
+ *   tokenArray (char**): Array of tokens from input line
  * 
  * Returns:
- * 
+ *   None 
  */
-void execute(char** tokenArray, int numTokens){
-  for(int k = 0; k < numTokens; k++){
-    if(tokenArray[k] != NULL){
-      int len = strlen(tokenArray[k]);
-      for(int j = 0; j < len; j++){
-        char printed = tokenArray[k][j];
-        printf("%d\n", printed);   
-
-      }
-    }
+void executeGeneral(char** tokenArray){
+  const char NEW_LINE = '\n';
+  int child = fork();
+  if (child < 0) {
+    // fork failed; exit
+    fprintf(stderr, "fork failed\n");
+    exit(1);
   }
+  else if (child == 0) {
+    // child (new process)
+    execvp(tokenArray[0], tokenArray);
+
+    // print new line if execvp fails (==-1) and exit process
+    // these lines will not run unless execvp has failed
+    printf("%c", NEW_LINE);
+    exit(1);
+  }
+  else {
+    // parent goes down this path (main)
+    // https://stackoverflow.com/questions/903864/how-to-exit-a-child-process-and-return-its-status-from-execvp
+    wait(NULL);
+  }
+
 }
 
 /**
@@ -173,7 +188,7 @@ int main (void){
     if(validInput){
       numTokens = countTokens(input, MAX_LINE_LEN);
       char** tokenArray = parseInput(input, numTokens, MAX_LINE_LEN, MAX_TOKEN_LEN);
-      // execute(tokenArray);
+      executeGeneral(tokenArray);
 
       for(int k = 0; k < numTokens; k++){
         free(tokenArray[k]);
