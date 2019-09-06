@@ -9,14 +9,14 @@
  *   Verify that tokens in input line do not exceed maximum token length
  * 
  * Args:
- *   input      (char[]): Input C-string
- *   maxLineLen    (int): Maximum length of input
- *   maxTokenLen   (int): Maximum length of tokens
+ *   input      (char*): Input C-string
+ *   maxLineLen   (int): Maximum length of input
+ *   maxTokenLen  (int): Maximum length of tokens
  * 
  * Returns:
  *   (int): Returns 1 if all tokens are within maximum limit
  */
-int checkTokens(char input[], int maxLineLen, int maxTokenLen){
+int checkTokens(char* input, int maxLineLen, int maxTokenLen){
   const char SPACE_CHAR = ' ';
   int tokenLen = 0;
   int k = 0;
@@ -41,14 +41,14 @@ int checkTokens(char input[], int maxLineLen, int maxTokenLen){
  *   token length is valid
  * 
  * Args:
- *   input      (char[]): Input C-string
- *   maxLineLen    (int): Maximum length of input
- *   maxTokenLen   (int): Maximum length of tokens
+ *   input      (char*): Input C-string
+ *   maxLineLen   (int): Maximum length of input
+ *   maxTokenLen  (int): Maximum length of tokens
  * 
  * Returns:
  *   (int): Returns 1 if string is valid, 0 if string is invalid
  */
-int checkInput(char input[], int maxLineLen, int maxTokenLen){
+int checkInput(char* input, int maxLineLen, int maxTokenLen){
   if(strlen(input) > maxLineLen + 1){
     return 0;
   }
@@ -63,13 +63,13 @@ int checkInput(char input[], int maxLineLen, int maxTokenLen){
  *   Count number of tokens in input line
  * 
  * Args:
- *   input      (char[]): Pointer to input c-string
- *   maxLineLen (int): Maximum length of tokens
+ *   input     (char*): Pointer to input c-string
+ *   maxLineLen  (int): Maximum length of tokens
  * 
  * Returns:
  *   (int): Number of tokens in input line
  */
-int countTokens(char input[], int maxLineLen){
+int countTokens(char* input, int maxLineLen){
   // strtok inserts null terminators in space delimiters
   char* inputCopy = (char*) malloc(maxLineLen * sizeof(char));
   strcpy(inputCopy, input);
@@ -90,16 +90,16 @@ int countTokens(char input[], int maxLineLen){
  *   Parse input line and check if commands are valid
  * 
  * Args:
- *   input       (char[]): Pointer to input c-string
- *   numTokens   (int): Number of tokens in string
- *   maxLineLen  (int): Maximum length of input
- *   maxTokenLen (int): Maximum length of tokens
+ *   input      (char*): Pointer to input c-string
+ *   numTokens    (int): Number of tokens in string
+ *   maxLineLen   (int): Maximum length of input
+ *   maxTokenLen  (int): Maximum length of tokens
  *  
  * Returns:
  *   (char**): Returns array of token c-strings
  * 
  */
-char** parseInput(char input[], int numTokens, int maxLineLen, int maxTokenLen){
+char** parseInput(char* input, int numTokens, int maxLineLen, int maxTokenLen){
   // strtok inserts null terminators in space delimiters
   // Remove this copy if input will not be used again
   char* inputCopy = (char*) malloc(maxLineLen * sizeof(char));
@@ -131,13 +131,22 @@ char** parseInput(char input[], int numTokens, int maxLineLen, int maxTokenLen){
  *   Execute input commands from command line
  * 
  * Args:
- *   input (char[]): Input C-string
+ *   tokenArray (char**): Input C-string
  * 
  * Returns:
  * 
  */
-void execute(char** tokenArray){
+void execute(char** tokenArray, int numTokens){
+  for(int k = 0; k < numTokens; k++){
+    if(tokenArray[k] != NULL){
+      int len = strlen(tokenArray[k]);
+      for(int j = 0; j < len; j++){
+        char printed = tokenArray[k][j];
+        printf("%d\n", printed);   
 
+      }
+    }
+  }
 }
 
 /**
@@ -174,9 +183,7 @@ int main (void){
     else{
       printf("%c", NEW_LINE);
     }
-
     free(input);
-
   }
   
   return 0;
