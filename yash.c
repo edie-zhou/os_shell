@@ -7,6 +7,9 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
+// Directions here:
+// TODO: https://docs.google.com/document/d/1LBMJslvYvw59uZ_8DNiiPzsp0heW3qesaalOo31IGYg/edit
+
 /** 
  * Purpose:
  *   Verify that tokens in input line do not exceed maximum token length
@@ -128,6 +131,41 @@ char** parseInput(char* input, int numTokens, int maxLineLen, int maxTokenLen){
   free(token);
   return tokenArray;
 }
+
+// see fig 5.4 in OSTEP
+// TODO: Rewrite this stub to be used when file redirection is used
+#include <fcntl.h>
+#include <sys/stat.h>
+int executeOutputRedirect(int argc, char *argv[]) {
+  int rc = fork();
+  if(rc < 0){
+    // fork failed; exit
+    fprintf(stderr, "fork failed\n");
+    exit(1);
+  }
+  else if(rc == 0){ // child: redirect standard output to a file
+    close(STDOUT_FILENO);
+    open("./p4.output", O_CREAT|O_WRONLY|O_TRUNC, S_IRWXU);
+    // now exec "wc"...
+    char *myargs[3];
+    myargs[0] = strdup("wc");
+    myargs[1] = strdup("p4.c");
+    myargs[2] = NULL;
+    execvp(myargs[0], myargs);
+  }
+  else{
+    // parent
+    int rc_wait = wait(NULL);
+  }
+  return 0;
+  // program: "wc" (word count)
+  // argument: file to count
+  // marks end of array
+  // runs word count
+}
+// TODO: Write execute function that handles piped i/o
+// TODO: Write execute handler function that decides which execute function to use,
+//       consider using indices of tokenArray
 
 /**
  * Purpose:
