@@ -108,22 +108,21 @@ char** parseInput(char input[], int numTokens, int maxLineLen, int maxTokenLen){
   int index = 0;
   char* delimiter = " ";
   char** tokenArray = (char**)calloc(numTokens, sizeof(char*));
-
-  // TODO: Look into refactoring this part of the code, possibly using a do-while loop
-  char* token = strtok(inputCopy, delimiter);
   char* arrayEntry = (char*)malloc(maxTokenLen * sizeof(char));
+  char* token = strtok(inputCopy, delimiter);
   strcpy(arrayEntry, token);
   tokenArray[index] = arrayEntry;
   while(token != NULL){
     index++;
     token = strtok(NULL, delimiter);
     if(token != NULL){
-    char* arrayEntry = (char*)malloc(maxTokenLen * sizeof(char));
-    strcpy(arrayEntry, token);
-    tokenArray[index] = arrayEntry;
+      char* arrayEntry = (char*)malloc(maxTokenLen * sizeof(char));
+      strcpy(arrayEntry, token);
+      tokenArray[index] = arrayEntry;
     }
   }
   free(inputCopy);
+  free(token);
   return tokenArray;
 }
 
@@ -137,7 +136,7 @@ char** parseInput(char input[], int numTokens, int maxLineLen, int maxTokenLen){
  * Returns:
  * 
  */
-void execute(char* input[]){
+void execute(char** tokenArray){
 
 }
 
@@ -165,6 +164,8 @@ int main (void){
     if(validInput){
       numTokens = countTokens(input, MAX_LINE_LEN);
       char** tokenArray = parseInput(input, numTokens, MAX_LINE_LEN, MAX_TOKEN_LEN);
+      // execute(tokenArray);
+
       for(int k = 0; k < numTokens; k++){
         free(tokenArray[k]);
       }
