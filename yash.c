@@ -174,6 +174,8 @@ int main (void){
       printf("%c", NEW_LINE);
     }
 
+    free(input);
+
   }
   
   return 0;
