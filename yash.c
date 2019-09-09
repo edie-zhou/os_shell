@@ -12,6 +12,9 @@
 // Directions here:
 // https://docs.google.com/document/d/1LBMJslvYvw59uZ_8DNiiPzsp0heW3qesaalOo31IGYg/edit
 
+// TODO: Refactor into several .c and .h files, separating read, parse, and
+//       execute would be a good place to start
+
 /** 
  * Purpose:
  *   Verify that tokens in input line do not exceed maximum token length
@@ -25,12 +28,14 @@
  *   (int): Returns 1 if all tokens are within maximum limit
  */
 int checkTokens(char* input, int maxLineLen, int maxTokenLen){
+  const int VALID = 1;
+  const int INVALID = 0;
   const char SPACE_CHAR = ' ';
   int tokenLen = 0;
   int k = 0;
   while(k < strlen(input)){
     if(tokenLen >= maxTokenLen){
-      return 0;
+      return INVALID;
     }
     else if((tokenLen < maxTokenLen) && (input[k] == SPACE_CHAR)){
       tokenLen = 0;
@@ -40,7 +45,7 @@ int checkTokens(char* input, int maxLineLen, int maxTokenLen){
     }
     k++;
   }
-  return 1;
+  return VALID;
 }
 
 /**
@@ -195,11 +200,11 @@ void changeRedirToks(char** tokenArray, int* inIndex, int* outIndex,
                      int* errIndex){
   const char* IN_REDIR = "<";
   const char* OUT_REDIR = ">";
-  const char* ERR_REDIR = ">>";
+  const char* ERR_REDIR = "2>";
 
   int index = 0;
   while(tokenArray[index] != NULL){
-    if(!strcmp(tokenArray[index],IN_REDIR)){
+    if(!strcmp(tokenArray[index], IN_REDIR)){
       *inIndex = index + 1;
       // Assign NULL to stop exec() from reading file redirection as part of
       // input
@@ -231,6 +236,7 @@ void changeRedirToks(char** tokenArray, int* inIndex, int* outIndex,
  */
 void execute(char** tokenArray){
   // TODO: Finish this function
+  // TODO: Investigate why close(STDIN_FILENO) gives bad file descriptor error
   const int INVALID = -1;
   const char NEW_LINE = '\n';
   int inIndex = -1;
@@ -249,7 +255,7 @@ void execute(char** tokenArray){
   }
   else if (child == 0) {
     if(inIndex != INVALID){
-      close(STDIN_FILENO);
+      // close(STDIN_FILENO);
       if((fdIn = open(tokenArray[inIndex], O_RDONLY, 0)) == INVALID){
           perror(tokenArray[inIndex]);
           exit(EXIT_FAILURE);
@@ -258,7 +264,7 @@ void execute(char** tokenArray){
       close(fdIn);
     }
     if(outIndex != INVALID){
-      close(STDOUT_FILENO);
+      // close(STDOUT_FILENO);
       if((fdOut = open(tokenArray[outIndex], O_CREAT | O_WRONLY | O_TRUNC,
           S_IRUSR | S_IRUSR | S_IRGRP | S_IROTH)) == INVALID){ 
         perror(tokenArray[outIndex]);
@@ -268,7 +274,7 @@ void execute(char** tokenArray){
       close(fdOut);
     }
     if(errIndex != INVALID){
-      close(STDERR_FILENO);
+      // close(STDERR_FILENO);
       if((fdOut = open(tokenArray[errIndex], O_CREAT | O_WRONLY | O_TRUNC,
           S_IRUSR | S_IRUSR | S_IRGRP | S_IROTH)) == INVALID){ 
         perror(tokenArray[errIndex]);
@@ -309,6 +315,7 @@ void checkJobControl(char** tokenArray, int numTokens){
   const char* BACKGROUND = "&";
   const char* BG_TOKEN = "bg";
   const char* FG_TOKEN = "fg";
+  const int BACKGRND_OFFSET = 2;
   
   // TODO: Add input verification to ensure that bg, fg, & are at expected
   // indices
@@ -320,7 +327,7 @@ void checkJobControl(char** tokenArray, int numTokens){
     // execute fg
     return;
   }
-  else if(!strcmp(tokenArray[numTokens - 1], BACKGROUND)){
+  else if(!strcmp(tokenArray[numTokens - BACKGRND_OFFSET], BACKGROUND)){
     // execute background
     return;
   }
