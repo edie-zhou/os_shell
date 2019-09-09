@@ -211,25 +211,15 @@ void executeGeneral(char** tokenArray){
  * Args:
  *   tokenArray (char**): Array of tokens from input line
  *   numTokens     (int): Number of tokens in string
- *   maxTokenLen   (int): Maximum length of tokens
  * 
  * Returns:
  *   None
  */
-void checkJobControl(char** tokenArray, int numTokens, int maxTokenLen){
-  const char* IN_REDIR_TOK = "<";
-  const char* OUT_REDIR_TOK = ">";
-  const char* STDERR_REDIR_TOK = ">>";
-  const char* PIPE_TOK = "|";
+void checkJobControl(char** tokenArray, int numTokens){
   const char* BACKGROUND = "&";
   const char* BG_TOKEN = "bg";
   const char* FG_TOKEN = "fg";
-  int pipeIndex = -1;
-  int outRedirIndex = -1;
-  int inRedirIndex = -1;
-  int stderrIndex = -1;
   
-
   if(tokenArray[0] == BG_TOKEN){
     // execute bg
   }
