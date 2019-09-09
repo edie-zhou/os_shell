@@ -105,16 +105,19 @@ int countTokens(char* input, int maxLineLen){
  *   (char**): Returns array of token c-strings
  * 
  */
-char** createTokenArray(char* input, int numTokens, int maxLineLen, int maxTokenLen){
+char** createTokenArray(char* input, int numTokens, int maxLineLen,
+                        int maxTokenLen){
+
   // strtok inserts null terminators in space delimiters
   // Remove this copy if input will not be used again
   char* inputCopy = (char*) malloc(maxLineLen * sizeof(char));
   strcpy(inputCopy, input);
-  
-  int index = 0;
-  char* delimiter = " ";
+
   char** tokenArray = (char**)calloc(numTokens, sizeof(char*));
   char* arrayEntry = (char*)malloc(maxTokenLen * sizeof(char));
+
+  const char* delimiter = " ";
+  int index = 0;
   char* token = strtok(inputCopy, delimiter);
   strcpy(arrayEntry, token);
   tokenArray[index] = arrayEntry;
@@ -129,6 +132,7 @@ char** createTokenArray(char* input, int numTokens, int maxLineLen, int maxToken
   }
   free(inputCopy);
   free(token);
+
   return tokenArray;
 }
 
@@ -172,12 +176,12 @@ int executeFileRedirect(int argc, char *argv[]) {
  *   Execute general input commands from command line
  * 
  * Args:
- *   tokenArray (char**): Array of tokens from input line
+ *   tokenArray (char**): Array of tokens from command input
  * 
  * Returns:
  *   None 
  */
-void executeGeneral(char** tokenArray){
+void execGeneral(char** tokenArray){
   const char NEW_LINE = '\n';
   int child = fork();
   if (child < 0) {
@@ -204,12 +208,103 @@ void executeGeneral(char** tokenArray){
 
 /**
  * Purpose:
- *   Checks input tokens for job control tokens
- *     * bg and fg will always be at tokenArray[0]
- *     * & will always be at tokenArray[numTokens - 1]
+ *   Find indices for input, output, and error redirection in a command and
+ *   replace tokens will NULL
  * 
  * Args:
- *   tokenArray (char**): Array of tokens from input line
+ *   tokenArray (char**): Array of tokens from command input
+ *   inIndex      (int*): Index of input redirection token 
+ *   outIndex     (int*): Index of output redirection token 
+ *   errIndex     (int*): Index of error redirection token 
+ *   
+ * Returns:
+ *   None  
+ */ 
+void changeRedirIndices(char** tokenArray, int* inIndex, int* outIndex, int* errIndex){
+  const char NEW_LINE = '\n';
+  const char* IN_REDIR = "<";
+  const char* OUT_REDIR = ">";
+  const char* ERR_REDIR = ">>";
+
+  int index = 0;
+  while(tokenArray[index] != NULL){
+    if((tokenArray[index] == IN_REDIR) &&
+       (tokenArray[index + 1] != NULL)){
+      inIndex = index + 1;
+      // Assign NULL to stop exec() from reading file redirection as part of
+      // input
+      tokenArray[index] = NULL;
+    }
+    else if((tokenArray[index] == OUT_REDIR) &&
+            (tokenArray[index + 1] != NULL)){
+      outIndex = index + 1;
+      tokenArray[index] = NULL;
+    }
+    else if((tokenArray[index] == ERR_REDIR) &&
+            (tokenArray[index + 1] != NULL)){
+      errIndex = index + 1;
+      tokenArray[index] = NULL;
+    }
+    else if(tokenArray[index + 1] != NULL){
+      // ERROR: redirect with no target file
+      printf("%c", NEW_LINE);
+      return;
+    }
+    index++;
+  }
+
+  return;
+}
+
+/**
+ * Purpose:
+ *   Execute input line with file redirections
+ * 
+ * Args: 
+ *   tokenArray (char**): Array of tokens from command input
+ * 
+ * Returns:
+ *   None
+ */
+void execRedirect(char** tokenArray){
+  const char NEW_LINE = '\n';
+  const int VALID_INPUT = 1;
+  int inIndex = -1;
+  int outIndex = -1;
+  int errIndex = -1;
+
+  changeRedirIndices(tokenArray, inIndex, outIndex, errIndex);
+
+  int child = fork();
+  if (child < 0) {
+    // fork failed; exit
+    fprintf(stderr, "fork failed\n");
+    exit(1);
+  }
+  else if (child == 0) {
+    // child (new process)
+    execvp(tokenArray[0], tokenArray);
+
+    // print new line if execvp fails (==-1) and exit process
+    // these lines will not run unless execvp has failed
+    printf("%c", NEW_LINE);
+    exit(1);
+  }
+  else {
+    // parent goes down this path (main)
+    // https://stackoverflow.com/questions/903864/how-to-exit-a-child-process-and-return-its-status-from-execvp
+    wait(NULL);
+  } 
+}
+
+/**
+ * Purpose:
+ *   Checks input tokens for job control tokens
+ *     * bg, fg should be at tokenArray[0]
+ *     * & should be at tokenArray[numTokens - 1]
+ * 
+ * Args:
+ *   tokenArray (char**): Array of tokens from command input
  *   numTokens     (int): Number of tokens in string
  * 
  * Returns:
@@ -220,23 +315,29 @@ void checkJobControl(char** tokenArray, int numTokens){
   const char* BG_TOKEN = "bg";
   const char* FG_TOKEN = "fg";
   
+  // TODO: Add input verification to ensure that bg, fg, & are at expected
+  // indices
   if(tokenArray[0] == BG_TOKEN){
     // execute bg
+    return;
   }
   else if(tokenArray[0] == FG_TOKEN){
     // execute fg
+    return;
   }
   else if(tokenArray[numTokens - 1] == BACKGROUND){
     // execute background
+    return;
   }
   else{
-    executeGeneral(tokenArray);
+    execGeneral(tokenArray);
+    return;
   }
 }
 
 /**
  * Purpose:
- *   Loops yash shell until user terminates program
+ *   Loops yash shell until user terminates program (CTRL+D)
  * 
  * Args:
  *   None
@@ -256,10 +357,11 @@ void shellLoop(void){
   while(input = readline(prompt)){
     validInput = checkInput(input, MAX_LINE_LEN, MAX_TOKEN_LEN);
     if(validInput){
+
       numTokens = countTokens(input, MAX_LINE_LEN);
       char** tokenArray = createTokenArray(input, numTokens, MAX_LINE_LEN, MAX_TOKEN_LEN);
-      // execute(tokenArray, numTokens, MAX_TOKEN_LEN);
-      executeGeneral(tokenArray);
+
+      checkJobControl(tokenArray, numTokens);
 
       for(int k = 0; k < numTokens; k++){
         free(tokenArray[k]);
@@ -271,6 +373,8 @@ void shellLoop(void){
     }
     free(input);
   }
+
+  return;
 }
 
 /**
