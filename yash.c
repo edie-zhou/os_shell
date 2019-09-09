@@ -93,7 +93,7 @@ int countTokens(char* input, int maxLineLen){
 
 /**
  * Purpose:
- *   Parse input line and check if commands are valid
+ *   Create array of token C-strings from input line
  * 
  * Args:
  *   input      (char*): Pointer to input c-string
@@ -105,7 +105,7 @@ int countTokens(char* input, int maxLineLen){
  *   (char**): Returns array of token c-strings
  * 
  */
-char** parseInput(char* input, int numTokens, int maxLineLen, int maxTokenLen){
+char** createTokenArray(char* input, int numTokens, int maxLineLen, int maxTokenLen){
   // strtok inserts null terminators in space delimiters
   // Remove this copy if input will not be used again
   char* inputCopy = (char*) malloc(maxLineLen * sizeof(char));
@@ -136,7 +136,7 @@ char** parseInput(char* input, int numTokens, int maxLineLen, int maxTokenLen){
 // TODO: Rewrite this stub to be used when file redirection is used
 #include <fcntl.h>
 #include <sys/stat.h>
-int executeOutputRedirect(int argc, char *argv[]) {
+int executeFileRedirect(int argc, char *argv[]) {
   int rc = fork();
   if(rc < 0){
     // fork failed; exit
@@ -204,6 +204,48 @@ void executeGeneral(char** tokenArray){
 
 /**
  * Purpose:
+ *   Checks input tokens for job control tokens
+ *     * bg and fg will always be at tokenArray[0]
+ *     * & will always be at tokenArray[numTokens - 1]
+ * 
+ * Args:
+ *   tokenArray (char**): Array of tokens from input line
+ *   numTokens     (int): Number of tokens in string
+ *   maxTokenLen   (int): Maximum length of tokens
+ * 
+ * Returns:
+ *   None
+ */
+void checkJobControl(char** tokenArray, int numTokens, int maxTokenLen){
+  const char* IN_REDIR_TOK = "<";
+  const char* OUT_REDIR_TOK = ">";
+  const char* STDERR_REDIR_TOK = ">>";
+  const char* PIPE_TOK = "|";
+  const char* BACKGROUND = "&";
+  const char* BG_TOKEN = "bg";
+  const char* FG_TOKEN = "fg";
+  int pipeIndex = -1;
+  int outRedirIndex = -1;
+  int inRedirIndex = -1;
+  int stderrIndex = -1;
+  
+
+  if(tokenArray[0] == BG_TOKEN){
+    // execute bg
+  }
+  else if(tokenArray[0] == FG_TOKEN){
+    // execute fg
+  }
+  else if(tokenArray[numTokens - 1] == BACKGROUND){
+    // execute background
+  }
+  else{
+    executeGeneral(tokenArray);
+  }
+}
+
+/**
+ * Purpose:
  *   Driver for shell program
  * 
  * Args:
@@ -225,7 +267,8 @@ int main (void){
     validInput = checkInput(input, MAX_LINE_LEN, MAX_TOKEN_LEN);
     if(validInput){
       numTokens = countTokens(input, MAX_LINE_LEN);
-      char** tokenArray = parseInput(input, numTokens, MAX_LINE_LEN, MAX_TOKEN_LEN);
+      char** tokenArray = createTokenArray(input, numTokens, MAX_LINE_LEN, MAX_TOKEN_LEN);
+      // execute(tokenArray, numTokens, MAX_TOKEN_LEN);
       executeGeneral(tokenArray);
 
       for(int k = 0; k < numTokens; k++){
