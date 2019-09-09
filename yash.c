@@ -235,8 +235,10 @@ void changeRedirToks(char** tokenArray, int* inIndex, int* outIndex,
  *   None
  */
 void execute(char** tokenArray){
-  // TODO: Finish this function
   // TODO: Investigate why close(STDIN_FILENO) gives bad file descriptor error
+  // TODO: Fix STDERR file redirect (2>)
+  // TODO: Implement piping
+  // TODO: Implement job control
   const int INVALID = -1;
   const char NEW_LINE = '\n';
   int inIndex = -1;
