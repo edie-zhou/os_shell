@@ -236,15 +236,15 @@ void checkJobControl(char** tokenArray, int numTokens){
 
 /**
  * Purpose:
- *   Driver for shell program
+ *   Loops yash shell until user terminates program
  * 
  * Args:
  *   None
  * 
  * Returns:
- *   (int): 0 on exit success
+ *   None
  */
-int main (void){
+void shellLoop(void){
   const char NEW_LINE = '\n';
   const int MAX_LINE_LEN = 2000;
   const int MAX_TOKEN_LEN = 30;
@@ -271,6 +271,21 @@ int main (void){
     }
     free(input);
   }
+}
+
+/**
+ * Purpose:
+ *   Driver for shell program
+ * 
+ * Args:
+ *   None
+ * 
+ * Returns:
+ *   (int): 0 on exit success
+ */
+int main (void){
   
+  shellLoop();
+
   return 0;
 }
