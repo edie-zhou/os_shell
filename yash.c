@@ -59,13 +59,15 @@ int checkTokens(char* input, int maxLineLen, int maxTokenLen){
 int checkInput(char* input, int maxLineLen, int maxTokenLen){
   // TODO: Add function to ensure file redir redirects to a file e.g.:# cat hello.txt >
   // TODO: Add function to ensure pipe pipes to a valid command e.g.:# ls |
+  const int INVALID = 0;
+  const int VALID = 1;
   if(strlen(input) > maxLineLen + 1){
-    return 0;
+    return INVALID;
   }
-  if(!checkTokens(input, maxLineLen, maxTokenLen)){
-    return 0;
+  else if(!checkTokens(input, maxLineLen, maxTokenLen)){
+    return INVALID;
   }
-  return 1;
+  return VALID;
 }
 
 /**
@@ -197,17 +199,17 @@ void changeRedirToks(char** tokenArray, int* inIndex, int* outIndex,
 
   int index = 0;
   while(tokenArray[index] != NULL){
-    if(tokenArray[index] == IN_REDIR){
+    if(!strcmp(tokenArray[index],IN_REDIR)){
       *inIndex = index + 1;
       // Assign NULL to stop exec() from reading file redirection as part of
       // input
       tokenArray[index] = NULL;
     }
-    else if(tokenArray[index] == OUT_REDIR){
+    else if(!strcmp(tokenArray[index], OUT_REDIR)){
       *outIndex = index + 1;
       tokenArray[index] = NULL;
     }
-    else if(tokenArray[index] == ERR_REDIR){
+    else if(!strcmp(tokenArray[index], ERR_REDIR)){
       *errIndex = index + 1;
       tokenArray[index] = NULL;
     }
@@ -310,15 +312,15 @@ void checkJobControl(char** tokenArray, int numTokens){
   
   // TODO: Add input verification to ensure that bg, fg, & are at expected
   // indices
-  if(tokenArray[0] == BG_TOKEN){
+  if(!strcmp(tokenArray[0], BG_TOKEN)){
     // execute bg
     return;
   }
-  else if(tokenArray[0] == FG_TOKEN){
+  else if(!strcmp(tokenArray[0], FG_TOKEN)){
     // execute fg
     return;
   }
-  else if(tokenArray[numTokens - 1] == BACKGROUND){
+  else if(!strcmp(tokenArray[numTokens - 1], BACKGROUND)){
     // execute background
     return;
   }
