@@ -158,6 +158,7 @@ char** createTokenArray(char* input, int numTokens, int maxLineLen,
  *   None 
  */
 void execGeneral(char** tokenArray){
+  // TODO: Remove this function once execute is working
   const char NEW_LINE = '\n';
   int child = fork();
   if (child < 0) {
@@ -235,8 +236,6 @@ void changeRedirToks(char** tokenArray, int* inIndex, int* outIndex,
  *   None
  */
 void execute(char** tokenArray){
-  // TODO: Investigate why close(STDIN_FILENO) gives bad file descriptor error
-  // TODO: Fix STDERR file redirect (2>)
   // TODO: Implement piping
   // TODO: Implement job control
   const int INVALID = -1;
@@ -257,7 +256,6 @@ void execute(char** tokenArray){
   }
   else if (child == 0) {
     if(inIndex != INVALID){
-      // close(STDIN_FILENO);
       if((fdIn = open(tokenArray[inIndex], O_RDONLY, 0)) == INVALID){
           perror(tokenArray[inIndex]);
           exit(EXIT_FAILURE);
@@ -266,7 +264,6 @@ void execute(char** tokenArray){
       close(fdIn);
     }
     if(outIndex != INVALID){
-      // close(STDOUT_FILENO);
       if((fdOut = open(tokenArray[outIndex], O_CREAT | O_WRONLY | O_TRUNC,
           S_IRUSR | S_IRUSR | S_IRGRP | S_IROTH)) == INVALID){ 
         perror(tokenArray[outIndex]);
@@ -276,7 +273,6 @@ void execute(char** tokenArray){
       close(fdOut);
     }
     if(errIndex != INVALID){
-      // close(STDERR_FILENO);
       if((fdOut = open(tokenArray[errIndex], O_CREAT | O_WRONLY | O_TRUNC,
           S_IRUSR | S_IRUSR | S_IRGRP | S_IROTH)) == INVALID){ 
         perror(tokenArray[errIndex]);
