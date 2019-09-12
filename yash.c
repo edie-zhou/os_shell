@@ -149,42 +149,6 @@ char** createTokenArray(char* input, int numTokens, int maxLineLen,
 
 /**
  * Purpose:
- *   Execute general input commands from command line
- * 
- * Args:
- *   tokenArray (char**): Array of tokens from command input
- * 
- * Returns:
- *   None 
- */
-void execGeneral(char** tokenArray){
-  // TODO: Remove this function once execute is working
-  const char NEW_LINE = '\n';
-  int child = fork();
-  if (child < 0) {
-    // fork failed; exit
-    fprintf(stderr, "Fork failed\n");
-    exit(EXIT_FAILURE);
-  }
-  else if (child == 0) {
-    // child (new process)
-    execvp(tokenArray[0], tokenArray);
-
-    // print new line if execvp fails (==-1) and exit process
-    // these lines will not run unless execvp has failed
-    printf("%c", NEW_LINE);
-    exit(EXIT_FAILURE);
-  }
-  else {
-    // parent goes down this path (main)
-    // https://stackoverflow.com/questions/903864/how-to-exit-a-child-process-and-return-its-status-from-execvp
-    wait(NULL);
-  }
-
-}
-
-/**
- * Purpose:
  *   Find indices for input, output, and error redirection in a command and
  *   replace tokens with NULL
  * 
@@ -235,7 +199,7 @@ void changeRedirToks(char** tokenArray, int* inIndex, int* outIndex,
  * Returns:
  *   None
  */
-void execute(char** tokenArray){
+void exec(char** tokenArray){
   // TODO: Implement piping
   // TODO: Implement job control
   const int INVALID = -1;
