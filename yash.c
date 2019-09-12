@@ -194,12 +194,12 @@ void changeRedirToks(char** tokenArray, int* inIndex, int* outIndex,
  *   Execute input line with file redirections
  * 
  * Args: 
- *   tokenArray (char**): Array of tokens from command input
+ *   tokenArray (char**): Token array from command input
  * 
  * Returns:
  *   None
  */
-void exec(char** tokenArray){
+void execute(char** tokenArray){
   // TODO: Implement piping
   // TODO: Implement job control
   const int INVALID = -1;
@@ -209,8 +209,7 @@ void exec(char** tokenArray){
   int errIndex = -1;
   int fdIn;
   int fdOut;
-
-  changeRedirToks(tokenArray, &inIndex, &outIndex, &errIndex);
+  int fdErr;
 
   int child = fork();
   if (child < 0) {
@@ -219,6 +218,11 @@ void exec(char** tokenArray){
     exit(EXIT_FAILURE);
   }
   else if (child == 0) {
+    inIndex = -1;
+    outIndex = -1;
+    errIndex = -1;
+    changeRedirToks(tokenArray, &inIndex, &outIndex, &errIndex);
+
     if(inIndex != INVALID){
       if((fdIn = open(tokenArray[inIndex], O_RDONLY, 0)) == INVALID){
           perror(tokenArray[inIndex]);
@@ -229,7 +233,7 @@ void exec(char** tokenArray){
     }
     if(outIndex != INVALID){
       if((fdOut = open(tokenArray[outIndex], O_CREAT | O_WRONLY | O_TRUNC,
-          S_IRUSR | S_IRUSR | S_IRGRP | S_IROTH)) == INVALID){ 
+          S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
         perror(tokenArray[outIndex]);
         exit(EXIT_FAILURE);
       }
@@ -237,19 +241,198 @@ void exec(char** tokenArray){
       close(fdOut);
     }
     if(errIndex != INVALID){
-      if((fdOut = open(tokenArray[errIndex], O_CREAT | O_WRONLY | O_TRUNC,
-          S_IRUSR | S_IRUSR | S_IRGRP | S_IROTH)) == INVALID){ 
+      if((fdErr = open(tokenArray[errIndex], O_CREAT | O_WRONLY | O_TRUNC,
+          S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
         perror(tokenArray[errIndex]);
         exit(EXIT_FAILURE);
       }
-      dup2(fdOut, STDERR_FILENO);
-      close(fdOut);
+      dup2(fdErr, STDERR_FILENO);
+      close(fdErr);
     }
     // child (new process)
     execvp(tokenArray[0], tokenArray);
 
     // print new line if execvp fails (==-1) and exit process
     // these lines will not run unless execvp() has failed
+    printf("%c", NEW_LINE);
+    exit(EXIT_FAILURE);
+  }
+  else {
+    // parent goes down this path (main)
+    // https://stackoverflow.com/questions/903864/how-to-exit-a-child-process-and-return-its-status-from-execvp
+    wait(NULL);
+  } 
+}
+
+/**
+ * Purpose:
+ *   Find index of pipe char in token array
+ * Args:
+ *   tokenArray (char**): Token array from command input
+ * Returns:
+ *   (int): Index of pipe token
+ */
+int findPipeIndex(char** tokenArray){
+  const char* PIPE = "|";
+  int index = 0;
+  int pipeIndex = -1;
+  while(tokenArray[index] != NULL){
+    if(strcmp(tokenArray[index],PIPE) == 0){
+      pipeIndex = index;
+    }
+    index++;
+  }
+  return pipeIndex;
+}
+
+/**
+ * Purpose:
+ *   Slice command string at pipe index
+ * 
+ * Args:
+ *   cmd1 (char**): Token array for command before pipe
+ *   cmd2 (char**): Token array for command after pipe
+ *   
+ * Returns:
+ *   None
+ */ 
+void sliceCmd(char** cmd1, char** cmd2){
+  return;
+}
+
+/**
+ * Purpose:
+ *   Execute input line with file redirections and pipes
+ * 
+ * Args: 
+ *   cmd1 (char**): Token array for command before pipe
+ *   cmd2 (char**): Token array for command after pipe
+ * 
+ * Returns:
+ *   None
+ */
+void executePipe(char** cmd1, char** cmd2){
+  // TODO: Implement piping
+  // TODO: Implement job control
+  const int INVALID = -1;
+  const char NEW_LINE = '\n';
+  int child1;
+  int child2;
+  int inIndex;
+  int outIndex;
+  int errIndex;
+  int fdIn;
+  int fdOut;
+  int fdErr;
+
+  int pfd[2];
+  pipe(pfd);
+  
+  
+
+  child1 = fork();
+  if (child1 < 0) {
+    // fork failed; exit
+    fprintf(stderr, "Fork failed\n");
+    exit(EXIT_FAILURE);
+  }
+  else if (child1 == 0){
+    // file redir
+    inIndex = -1;
+    outIndex = -1;
+    errIndex = -1;
+    changeRedirToks(cmd1, &inIndex, &outIndex, &errIndex);
+    if(inIndex != INVALID){
+      if((fdIn = open(cmd1[inIndex], O_RDONLY, 0)) == INVALID){
+          perror(cmd1[inIndex]);
+          exit(EXIT_FAILURE);
+      }
+      dup2(fdIn, STDIN_FILENO);
+      close(fdIn);
+    }
+    if(outIndex != INVALID){
+      if((fdOut = open(cmd1[outIndex], O_CREAT | O_WRONLY | O_TRUNC,
+          S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
+        perror(cmd1[outIndex]);
+        exit(EXIT_FAILURE);
+      }
+      dup2(fdOut, STDOUT_FILENO);
+      close(fdOut);
+    }
+    if(errIndex != INVALID){
+      if((fdErr = open(cmd1[errIndex], O_CREAT | O_WRONLY | O_TRUNC,
+          S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
+        perror(cmd1[errIndex]);
+        exit(EXIT_FAILURE);
+      }
+      dup2(fdErr, STDERR_FILENO);
+      close(fdErr);
+    }
+
+    // piping
+    dup2(pfd[1], 1);
+    close(pfd[0]);
+
+    // child (new process)
+    execvp(cmd1[0], cmd1);
+
+    fprintf(stderr, "Exec failed\n");
+    printf("%c", NEW_LINE);
+    exit(EXIT_FAILURE);
+  }
+  else {
+    // parent goes down this path (main)
+    // https://stackoverflow.com/questions/903864/how-to-exit-a-child-process-and-return-its-status-from-execvp
+    wait(NULL);
+  }
+
+  child2 = fork();
+  if (child2 < 0) {
+    // fork failed; exit
+    fprintf(stderr, "Fork failed\n");
+    exit(EXIT_FAILURE);
+  }
+  else if (child2 == 0) {
+    inIndex = -1;
+    outIndex = -1;
+    errIndex = -1;
+    changeRedirToks(cmd2, &inIndex, &outIndex, &errIndex);
+    
+    if(inIndex != INVALID){
+      if((fdIn = open(cmd2[inIndex], O_RDONLY, 0)) == INVALID){
+          perror(cmd2[inIndex]);
+          exit(EXIT_FAILURE);
+      }
+      dup2(fdIn, STDIN_FILENO);
+      close(fdIn);
+    }
+    if(outIndex != INVALID){
+      if((fdOut = open(cmd2[outIndex], O_CREAT | O_WRONLY | O_TRUNC,
+          S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
+        perror(cmd2[outIndex]);
+        exit(EXIT_FAILURE);
+      }
+      dup2(fdOut, STDOUT_FILENO);
+      close(fdOut);
+    }
+    if(errIndex != INVALID){
+      if((fdErr = open(cmd2[errIndex], O_CREAT | O_WRONLY | O_TRUNC,
+          S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
+        perror(cmd2[errIndex]);
+        exit(EXIT_FAILURE);
+      }
+      dup2(fdErr, STDERR_FILENO);
+      close(fdErr);
+    }
+
+    // piping
+    dup2(pfd[0], 0);
+    close(pfd[1]);
+
+    // child (new process)
+    execvp(cmd2[0], cmd2);
+
+    fprintf(stderr, "Exec failed\n");
     printf("%c", NEW_LINE);
     exit(EXIT_FAILURE);
   }
@@ -294,7 +477,7 @@ void checkJobControl(char** tokenArray, int numTokens){
     return;
   }
   else{
-    execute(tokenArray);
+    // ??
     return;
   }
 }
@@ -311,11 +494,14 @@ void checkJobControl(char** tokenArray, int numTokens){
  */
 void shellLoop(void){
   const char NEW_LINE = '\n';
+  const char* prompt = "# ";
+  const int INVALID = -1;
   const int MAX_LINE_LEN = 2000;
   const int MAX_TOKEN_LEN = 30;
   int validInput = 0;
   int numTokens = 0;
-  char* prompt = "# ";
+  int pipeIndex = -1;
+  
   char* input;
   
   while(input = readline(prompt)){
@@ -326,12 +512,25 @@ void shellLoop(void){
       char** tokenArray = createTokenArray(input, numTokens, MAX_LINE_LEN,
                                            MAX_TOKEN_LEN);
 
-      checkJobControl(tokenArray, numTokens);
+      // checkJobControl(tokenArray, numTokens);
+      
+      pipeIndex = findPipeIndex(tokenArray);
+      if(pipeIndex == INVALID){
+        execute(tokenArray);
 
-      for(int k = 0; k < numTokens; k++){
-        free(tokenArray[k]);
+        // free allocated memory
+        for(int k = 0; k < numTokens; k++){
+          free(tokenArray[k]);
+        }
+        free(tokenArray);
       }
-      free(tokenArray);
+      else{
+        char** cmd1;
+      }
+      // 
+      // executePipe(tokenArray);
+
+      
     }
     else{
       printf("%c", NEW_LINE);
