@@ -12,6 +12,11 @@
 // Directions here:
 // https://docs.google.com/document/d/1LBMJslvYvw59uZ_8DNiiPzsp0heW3qesaalOo31IGYg/edit
 
+// TODO: Implement job control
+// TODO: Add function to ensure file redir redirects to a file e.g.:# cat hello.txt >
+// TODO: Add function to ensure pipe pipes to a valid command e.g.:# ls |
+// TODO: Add input verification to ensure that bg, fg, & are at expected indices
+// TODO: fix free statements
 // TODO: Refactor into several .c and .h files, separating read, parse, and
 //       execute would be a good place to start
 
@@ -62,8 +67,6 @@ int checkTokens(char* input, int maxLineLen, int maxTokenLen){
  *   (int): Returns 1 if string is valid, 0 if string is invalid
  */
 int checkInput(char* input, int maxLineLen, int maxTokenLen){
-  // TODO: Add function to ensure file redir redirects to a file e.g.:# cat hello.txt >
-  // TODO: Add function to ensure pipe pipes to a valid command e.g.:# ls |
   const int INVALID = 0;
   const int VALID = 1;
   if(strlen(input) > maxLineLen + 1){
@@ -210,7 +213,6 @@ void redirectFile(char** input){
  *   None
  */
 void executeGeneral(char** input){
-  // TODO: Implement job control
   const int INVALID = -1;
   const char NEW_LINE = '\n';
   int child;
@@ -233,7 +235,6 @@ void executeGeneral(char** input){
   }
   else {
     // parent goes down this path (main)
-    // https://stackoverflow.com/questions/903864/how-to-exit-a-child-process-and-return-its-status-from-execvp
     wait(&status);
   } 
 }
@@ -250,7 +251,6 @@ void executeGeneral(char** input){
  *   None
  */
 void executePipe(char** cmd1, char** cmd2){
-  // TODO: Implement job control
   const int INVALID = -1;
   const char NEW_LINE = '\n';
   int child1;
@@ -280,7 +280,6 @@ void executePipe(char** cmd1, char** cmd2){
   }
   else {
     // parent goes down this path (main)
-    // https://stackoverflow.com/questions/903864/how-to-exit-a-child-process-and-return-its-status-from-execvp
     wait(&status1);
 
     child2 = fork();
@@ -303,7 +302,6 @@ void executePipe(char** cmd1, char** cmd2){
     }
     else {
       // parent goes down this path (main)
-      // https://stackoverflow.com/questions/903864/how-to-exit-a-child-process-and-return-its-status-from-execvp
       close(pfd[0]);
       close(pfd[1]);
       wait(&status2);
@@ -330,8 +328,6 @@ void checkJobControl(char** input, int numTokens){
   const char* FG_TOKEN = "fg";
   const int BACKGRND_OFFSET = 2;
   
-  // TODO: Add input verification to ensure that bg, fg, & are at expected
-  // indices
   if(!strcmp(input[0], BG_TOKEN)){
     // execute bg
     return;
@@ -383,7 +379,6 @@ void shellLoop(void){
 
         executeGeneral(cmd);
 
-        // TODO: fix memory free
         // free allocated memory
         // index = 0;
         // while(cmd[index] != NULL){
@@ -400,7 +395,6 @@ void shellLoop(void){
 
         executePipe(cmd1, cmd2);
 
-        // TODO: fix free statements
         // free allocated memory
         // index = 0;
         // int cmd1Freed = 0;
