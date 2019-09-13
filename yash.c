@@ -269,9 +269,9 @@ void executePipe(char** cmd1, char** cmd2){
   }
   else if (child1 == 0){
     // child 1 (new process)
-    redirectFile(cmd1);
     dup2(pfd[1], 1);
     close(pfd[0]);
+    redirectFile(cmd1);
     execvp(cmd1[0], cmd1);
 
     fprintf(stderr, "Exec failed\n");
