@@ -77,77 +77,6 @@ int checkInput(char* input, int maxLineLen, int maxTokenLen){
 
 /**
  * Purpose:
- *   Count number of tokens in input line
- * 
- * Args:
- *   input     (char*): Pointer to input c-string
- *   maxLineLen  (int): Maximum length of tokens
- * 
- * Returns:
- *   (int): Number of tokens in input line
- */
-int countTokens(char* input, int maxLineLen){
-  // strtok inserts null terminators in space delimiters
-  char* inputCopy = (char*) malloc(maxLineLen * sizeof(char));
-  strcpy(inputCopy, input);
-
-  char* delimiters = " ";
-  char* token = strtok(inputCopy, delimiters);
-  int numTokens = 1;
-  while(token != NULL){
-    token = strtok(NULL, delimiters);
-    numTokens++;
-  }
-  free(inputCopy);
-  return numTokens;
-} 
-
-/**
- * Purpose:
- *   Create array of token C-strings from input line
- * 
- * Args:
- *   input      (char*): Pointer to input c-string
- *   numTokens    (int): Number of tokens in string
- *   maxLineLen   (int): Maximum length of input
- *   maxTokenLen  (int): Maximum length of tokens
- *  
- * Returns:
- *   (char**): Returns array of token c-strings
- * 
- */
-char** createTokenArray(char* input, int numTokens, int maxLineLen,
-                        int maxTokenLen){
-  // strtok inserts null terminators in space delimiters
-  // Remove this copy if input will not be used again
-  char* inputCopy = (char*) malloc(maxLineLen * sizeof(char));
-  strcpy(inputCopy, input);
-
-  char** tokenArray = (char**)calloc(numTokens, sizeof(char*));
-  char* arrayEntry = (char*)malloc(maxTokenLen * sizeof(char));
-
-  const char* delimiter = " ";
-  int index = 0;
-  char* token = strtok(inputCopy, delimiter);
-  strcpy(arrayEntry, token);
-  tokenArray[index] = arrayEntry;
-  while(token != NULL){
-    index++;
-    token = strtok(NULL, delimiter);
-    if(token != NULL){
-      char* arrayEntry = (char*)malloc(maxTokenLen * sizeof(char));
-      strcpy(arrayEntry, token);
-      tokenArray[index] = arrayEntry;
-    }
-  }
-  free(inputCopy);
-  free(token);
-
-  return tokenArray;
-}
-
-/**
- * Purpose:
  *   Create array of token C-strings from input line split on input delimiter
  * 
  * Args:
@@ -158,7 +87,7 @@ char** createTokenArray(char* input, int numTokens, int maxLineLen,
  *   (char**): Returns array of token c-strings
  * 
  */
-char** splitStrArray(char* input, char* delim){
+char** splitStrArray(char* input, const char* delim){
   char** splitted = NULL;
   int numElements = 0;
 
@@ -490,13 +419,9 @@ void shellLoop(void){
   const char* PIPE = "|";
   const char* SPACE_CHAR = " ";
   const char* PROMPT = "# ";
-  const int INVALID = -1;
   const int MAX_LINE_LEN = 2001;
   const int MAX_TOKEN_LEN = 31;
   int validInput = 0;
-  int numTokens = 0;
-  int pipeIndex = -1;
-  int start = 0;
   int index = 0;
   
   char* input;
