@@ -35,8 +35,23 @@ int pidCh2 = -1;
  * Returns:
  *   None
  */
-void sigintHandler(int sigNum){
-
+static void sigintHandler(int sigNum){
+  const char* PROMPT = "# ";
+	printf("\n");
+  printf("PID: %d\n", getpid());
+  printf("shell pid: %d\n", pidShell);
+	if(getpid() == pidShell){
+    printf("%s", PROMPT);
+		return;
+  }
+	else if(pidCh2 != -1){
+		kill(pidCh2, SIGINT);
+    kill(pidCh1, SIGINT);
+	}
+  else if(pidCh1 != -1){
+    kill(pidCh1, SIGINT);
+	}
+  return;
 }
 
 /**
@@ -49,7 +64,19 @@ void sigintHandler(int sigNum){
  *   None
  */
 void sigtstpHandler(int sigNum){
-
+  const char* PROMPT = "# ";
+  printf("\n");
+	if(getpid() == pidShell){
+		printf("%s", PROMPT);
+  }
+	else if(pidCh2 != -1){
+		kill(pidCh2, SIGTSTP);
+    kill(pidCh1, SIGTSTP);
+	}
+  else if(pidCh1 != -1){
+    kill(pidCh1, SIGTSTP);
+	}
+  return;
 }
 
 /** 
@@ -416,6 +443,13 @@ void shellLoop(void){
   pidShell = getpid();
   pidCh1 = -1;
   pidCh2 = -1;
+
+  if (signal(SIGINT, sigintHandler) == SIG_ERR){
+    printf("signal(SIGINT) error");
+  }
+  if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
+    printf("signal(SIGTSTP) error");
+  } 
   
   while(input = readline(PROMPT)){
     validInput = checkInput(input, MAX_LINE_LEN, MAX_TOKEN_LEN);
