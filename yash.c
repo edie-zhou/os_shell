@@ -118,7 +118,6 @@ int countTokens(char* input, int maxLineLen){
  */
 char** createTokenArray(char* input, int numTokens, int maxLineLen,
                         int maxTokenLen){
-
   // strtok inserts null terminators in space delimiters
   // Remove this copy if input will not be used again
   char* inputCopy = (char*) malloc(maxLineLen * sizeof(char));
@@ -145,6 +144,38 @@ char** createTokenArray(char* input, int numTokens, int maxLineLen,
   free(token);
 
   return tokenArray;
+}
+
+/**
+ * Purpose:
+ *   Create array of token C-strings from input line split on input delimiter
+ * 
+ * Args:
+ *   input (char*): Pointer to input c-string
+ *   delim   (int): Delimiter to split on
+ *  
+ * Returns:
+ *   (char**): Returns array of token c-strings
+ * 
+ */
+char** splitStrArray(char* input, char* delim){
+  char** splitted = NULL;
+  int numElements = 0;
+
+  char* token = strtok(input, delim);
+  while(token != NULL){
+    numElements++;
+    splitted = realloc(splitted, numElements * sizeof(char*));
+    splitted[numElements - 1] = token;
+    token = strtok(NULL, delim);
+  }
+
+  // Assign NULL to last index
+  numElements++;
+  splitted = realloc(splitted, numElements * sizeof(char*));
+  splitted[numElements - 1] = 0;
+
+  return splitted;
 }
 
 /**
@@ -199,7 +230,7 @@ void changeRedirToks(char** tokenArray, int* inIndex, int* outIndex,
  * Returns:
  *   None
  */
-void execute(char** tokenArray){
+void executeGeneral(char** tokenArray){
   // TODO: Implement piping
   // TODO: Implement job control
   const int INVALID = -1;
@@ -266,42 +297,6 @@ void execute(char** tokenArray){
 
 /**
  * Purpose:
- *   Find index of pipe char in token array
- * Args:
- *   tokenArray (char**): Token array from command input
- * Returns:
- *   (int): Index of pipe token
- */
-int findPipeIndex(char** tokenArray){
-  const char* PIPE = "|";
-  int index = 0;
-  int pipeIndex = -1;
-  while(tokenArray[index] != NULL){
-    if(strcmp(tokenArray[index],PIPE) == 0){
-      pipeIndex = index;
-    }
-    index++;
-  }
-  return pipeIndex;
-}
-
-/**
- * Purpose:
- *   Slice command string at pipe index
- * 
- * Args:
- *   cmd1 (char**): Token array for command before pipe
- *   cmd2 (char**): Token array for command after pipe
- *   
- * Returns:
- *   None
- */ 
-void sliceCmd(char** cmd1, char** cmd2){
-  return;
-}
-
-/**
- * Purpose:
  *   Execute input line with file redirections and pipes
  * 
  * Args: 
@@ -327,8 +322,6 @@ void executePipe(char** cmd1, char** cmd2){
 
   int pfd[2];
   pipe(pfd);
-  
-  
 
   child1 = fork();
   if (child1 < 0) {
@@ -494,43 +487,72 @@ void checkJobControl(char** tokenArray, int numTokens){
  */
 void shellLoop(void){
   const char NEW_LINE = '\n';
-  const char* prompt = "# ";
+  const char* PIPE = "|";
+  const char* SPACE_CHAR = " ";
+  const char* PROMPT = "# ";
   const int INVALID = -1;
-  const int MAX_LINE_LEN = 2000;
-  const int MAX_TOKEN_LEN = 30;
+  const int MAX_LINE_LEN = 2001;
+  const int MAX_TOKEN_LEN = 31;
   int validInput = 0;
   int numTokens = 0;
   int pipeIndex = -1;
+  int start = 0;
+  int index = 0;
   
   char* input;
   
-  while(input = readline(prompt)){
+  while(input = readline(PROMPT)){
     validInput = checkInput(input, MAX_LINE_LEN, MAX_TOKEN_LEN);
     if(validInput){
-
-      numTokens = countTokens(input, MAX_LINE_LEN);
-      char** tokenArray = createTokenArray(input, numTokens, MAX_LINE_LEN,
-                                           MAX_TOKEN_LEN);
-
+      char** pipeArray = splitStrArray(input, PIPE);
       // checkJobControl(tokenArray, numTokens);
-      
-      pipeIndex = findPipeIndex(tokenArray);
-      if(pipeIndex == INVALID){
-        execute(tokenArray);
+      if(pipeArray[1] == NULL){
+        // no pipe
+        char** cmd = splitStrArray(input, SPACE_CHAR);
+
+        executeGeneral(cmd);
 
         // free allocated memory
-        for(int k = 0; k < numTokens; k++){
-          free(tokenArray[k]);
+        index = 0;
+        while(cmd[index] != NULL){
+          free(cmd[index]);
+          index++;
         }
-        free(tokenArray);
+        free(cmd[index]);
+        free(cmd);
       }
       else{
-        char** cmd1;
-      }
-      // 
-      // executePipe(tokenArray);
+        // pipe exists
+        char** cmd1 = splitStrArray(pipeArray[0], SPACE_CHAR);
+        char** cmd2 = splitStrArray(pipeArray[1], SPACE_CHAR);
 
-      
+        executePipe(cmd1, cmd2);
+
+        // free allocated memory
+        index = 0;
+        while(cmd1[index] != NULL){
+          free(cmd1[index]);
+          index++;
+        }
+        free(cmd1[index]);
+        free(cmd1);
+
+        index = 0;
+        while(cmd2[index] != NULL){
+          free(cmd2[index]);
+          index++;
+        }
+        free(cmd2[index]);
+        free(cmd2);
+
+        index = 0;
+        while(pipeArray[index] != NULL){
+          free(pipeArray[index]);
+          index++;
+        }
+        free(pipeArray[index]);
+        free(pipeArray);
+      }
     }
     else{
       printf("%c", NEW_LINE);
