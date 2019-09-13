@@ -170,6 +170,7 @@ void executeGeneral(char** tokenArray){
   int fdIn;
   int fdOut;
   int fdErr;
+  int status;
 
   int child = fork();
   if (child < 0) {
@@ -220,7 +221,7 @@ void executeGeneral(char** tokenArray){
   else {
     // parent goes down this path (main)
     // https://stackoverflow.com/questions/903864/how-to-exit-a-child-process-and-return-its-status-from-execvp
-    wait(NULL);
+    wait(&status);
   } 
 }
 
@@ -242,6 +243,8 @@ void executePipe(char** cmd1, char** cmd2){
   const char NEW_LINE = '\n';
   int child1;
   int child2;
+  int status1;
+  int status2;
   int inIndex;
   int outIndex;
   int errIndex;
@@ -305,64 +308,66 @@ void executePipe(char** cmd1, char** cmd2){
   else {
     // parent goes down this path (main)
     // https://stackoverflow.com/questions/903864/how-to-exit-a-child-process-and-return-its-status-from-execvp
-    wait(NULL);
-  }
+    wait(&status1);
 
-  child2 = fork();
-  if (child2 < 0) {
-    // fork failed; exit
-    fprintf(stderr, "Fork failed\n");
-    exit(EXIT_FAILURE);
-  }
-  else if (child2 == 0) {
-    inIndex = -1;
-    outIndex = -1;
-    errIndex = -1;
-    changeRedirToks(cmd2, &inIndex, &outIndex, &errIndex);
-    
-    if(inIndex != INVALID){
-      if((fdIn = open(cmd2[inIndex], O_RDONLY, 0)) == INVALID){
-          perror(cmd2[inIndex]);
+    child2 = fork();
+    if (child2 < 0) {
+      // fork failed; exit
+      fprintf(stderr, "Fork failed\n");
+      exit(EXIT_FAILURE);
+    }
+    else if (child2 == 0) {
+      inIndex = -1;
+      outIndex = -1;
+      errIndex = -1;
+      changeRedirToks(cmd2, &inIndex, &outIndex, &errIndex);
+      
+      if(inIndex != INVALID){
+        if((fdIn = open(cmd2[inIndex], O_RDONLY, 0)) == INVALID){
+            perror(cmd2[inIndex]);
+            exit(EXIT_FAILURE);
+        }
+        dup2(fdIn, STDIN_FILENO);
+        close(fdIn);
+      }
+      if(outIndex != INVALID){
+        if((fdOut = open(cmd2[outIndex], O_CREAT | O_WRONLY | O_TRUNC,
+            S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
+          perror(cmd2[outIndex]);
           exit(EXIT_FAILURE);
+        }
+        dup2(fdOut, STDOUT_FILENO);
+        close(fdOut);
       }
-      dup2(fdIn, STDIN_FILENO);
-      close(fdIn);
-    }
-    if(outIndex != INVALID){
-      if((fdOut = open(cmd2[outIndex], O_CREAT | O_WRONLY | O_TRUNC,
-          S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
-        perror(cmd2[outIndex]);
-        exit(EXIT_FAILURE);
+      if(errIndex != INVALID){
+        if((fdErr = open(cmd2[errIndex], O_CREAT | O_WRONLY | O_TRUNC,
+            S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
+          perror(cmd2[errIndex]);
+          exit(EXIT_FAILURE);
+        }
+        dup2(fdErr, STDERR_FILENO);
+        close(fdErr);
       }
-      dup2(fdOut, STDOUT_FILENO);
-      close(fdOut);
+
+      // piping
+      dup2(pfd[0], 0);
+      close(pfd[1]);
+
+      // child (new process)
+      execvp(cmd2[0], cmd2);
+
+      fprintf(stderr, "Exec failed\n");
+      printf("%c", NEW_LINE);
+      exit(EXIT_FAILURE);
     }
-    if(errIndex != INVALID){
-      if((fdErr = open(cmd2[errIndex], O_CREAT | O_WRONLY | O_TRUNC,
-          S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
-        perror(cmd2[errIndex]);
-        exit(EXIT_FAILURE);
-      }
-      dup2(fdErr, STDERR_FILENO);
-      close(fdErr);
-    }
-
-    // piping
-    dup2(pfd[0], 0);
-    close(pfd[1]);
-
-    // child (new process)
-    execvp(cmd2[0], cmd2);
-
-    fprintf(stderr, "Exec failed\n");
-    printf("%c", NEW_LINE);
-    exit(EXIT_FAILURE);
+    else {
+      // parent goes down this path (main)
+      // https://stackoverflow.com/questions/903864/how-to-exit-a-child-process-and-return-its-status-from-execvp
+      close(pfd[0]);
+      close(pfd[1]);
+      wait(&status2);
+    } 
   }
-  else {
-    // parent goes down this path (main)
-    // https://stackoverflow.com/questions/903864/how-to-exit-a-child-process-and-return-its-status-from-execvp
-    wait(NULL);
-  } 
 }
 
 /**
@@ -443,7 +448,6 @@ void shellLoop(void){
           free(cmd[index]);
           index++;
         }
-        free(cmd[index]);
         free(cmd);
       }
       else{
@@ -459,7 +463,6 @@ void shellLoop(void){
           free(cmd1[index]);
           index++;
         }
-        free(cmd1[index]);
         free(cmd1);
 
         index = 0;
@@ -467,7 +470,6 @@ void shellLoop(void){
           free(cmd2[index]);
           index++;
         }
-        free(cmd2[index]);
         free(cmd2);
 
         index = 0;
@@ -475,7 +477,6 @@ void shellLoop(void){
           free(pipeArray[index]);
           index++;
         }
-        free(pipeArray[index]);
         free(pipeArray);
       }
     }
