@@ -268,7 +268,7 @@ void executePipe(char** cmd1, char** cmd2){
     exit(EXIT_FAILURE);
   }
   else if (child1 == 0){
-    // child1
+    // child 1 (new process)
     redirectFile(cmd1);
     dup2(pfd[1], 1);
     close(pfd[0]);
@@ -278,35 +278,29 @@ void executePipe(char** cmd1, char** cmd2){
     printf("%c", NEW_LINE);
     exit(EXIT_FAILURE);
   }
-  else {
-    // parent goes down this path (main)
-    wait(&status1);
 
-    child2 = fork();
-    if (child2 < 0) {
-      // fork failed; exit
-      fprintf(stderr, "Fork failed\n");
-      exit(EXIT_FAILURE);
-    }
-    else if (child2 == 0) {
-      redirectFile(cmd2);
-      dup2(pfd[0], 0);
-      close(pfd[1]);
-
-      // child (new process)
-      execvp(cmd2[0], cmd2);
-
-      fprintf(stderr, "Exec failed\n");
-      printf("%c", NEW_LINE);
-      exit(EXIT_FAILURE);
-    }
-    else {
-      // parent goes down this path (main)
-      close(pfd[0]);
-      close(pfd[1]);
-      wait(&status2);
-    } 
+  child2 = fork();
+  if (child2 < 0) {
+    // fork failed; exit
+    fprintf(stderr, "Fork failed\n");
+    exit(EXIT_FAILURE);
   }
+  else if (child2 == 0){
+    // child 2 (new process)
+    dup2(pfd[0], 0);
+    close(pfd[1]);
+    redirectFile(cmd2);
+    execvp(cmd2[0], cmd2);
+
+    fprintf(stderr, "Exec failed\n");
+    printf("%c", NEW_LINE);
+    exit(EXIT_FAILURE);
+  }
+  // parent goes down this path (main)
+  close(pfd[0]);
+  close(pfd[1]);
+  wait(&status1);
+  wait(&status2);
 }
 
 /**
