@@ -113,35 +113,34 @@ char** splitStrArray(char* input, const char* delim){
  *   replace tokens with NULL
  * 
  * Args:
- *   tokenArray (char**): Array of tokens from command input
- *   inIndex      (int*): Index of input redirection token 
- *   outIndex     (int*): Index of output redirection token 
- *   errIndex     (int*): Index of error redirection token 
+ *   input   (char**): Array of tokens from command input
+ *   inIndex   (int*): Index of input redirection token 
+ *   outIndex  (int*): Index of output redirection token 
+ *   errIndex  (int*): Index of error redirection token 
  *   
  * Returns:
  *   None  
  */ 
-void changeRedirToks(char** tokenArray, int* inIndex, int* outIndex,
-                     int* errIndex){
+void changeRedirToks(char** input, int* inIndex, int* outIndex, int* errIndex){
   const char* IN_REDIR = "<";
   const char* OUT_REDIR = ">";
   const char* ERR_REDIR = "2>";
 
   int index = 0;
-  while(tokenArray[index] != NULL){
-    if(!strcmp(tokenArray[index], IN_REDIR)){
+  while(input[index] != NULL){
+    if(!strcmp(input[index], IN_REDIR)){
       *inIndex = index + 1;
       // Assign NULL to stop exec() from reading file redirection as part of
       // input
-      tokenArray[index] = NULL;
+      input[index] = NULL;
     }
-    else if(!strcmp(tokenArray[index], OUT_REDIR)){
+    else if(!strcmp(input[index], OUT_REDIR)){
       *outIndex = index + 1;
-      tokenArray[index] = NULL;
+      input[index] = NULL;
     }
-    else if(!strcmp(tokenArray[index], ERR_REDIR)){
+    else if(!strcmp(input[index], ERR_REDIR)){
       *errIndex = index + 1;
-      tokenArray[index] = NULL;
+      input[index] = NULL;
     }
     index++;
   }
@@ -151,15 +150,28 @@ void changeRedirToks(char** tokenArray, int* inIndex, int* outIndex,
 
 /**
  * Purpose:
+ *   Handle file redirect statements
+ * 
+ * Args:
+ *   
+ * Returns:
+ * 
+ */
+void redirectFile(){
+  return;
+}
+
+/**
+ * Purpose:
  *   Execute input line with file redirections
  * 
  * Args: 
- *   tokenArray (char**): Token array from command input
+ *   input (char**): Token array from command input
  * 
  * Returns:
  *   None
  */
-void executeGeneral(char** tokenArray){
+void executeGeneral(char** input){
   // TODO: Implement piping
   // TODO: Implement job control
   const int INVALID = -1;
@@ -182,36 +194,36 @@ void executeGeneral(char** tokenArray){
     inIndex = -1;
     outIndex = -1;
     errIndex = -1;
-    changeRedirToks(tokenArray, &inIndex, &outIndex, &errIndex);
+    changeRedirToks(input, &inIndex, &outIndex, &errIndex);
 
     if(inIndex != INVALID){
-      if((fdIn = open(tokenArray[inIndex], O_RDONLY, 0)) == INVALID){
-          perror(tokenArray[inIndex]);
+      if((fdIn = open(input[inIndex], O_RDONLY, 0)) == INVALID){
+          perror(input[inIndex]);
           exit(EXIT_FAILURE);
       }
       dup2(fdIn, STDIN_FILENO);
       close(fdIn);
     }
     if(outIndex != INVALID){
-      if((fdOut = open(tokenArray[outIndex], O_CREAT | O_WRONLY | O_TRUNC,
+      if((fdOut = open(input[outIndex], O_CREAT | O_WRONLY | O_TRUNC,
           S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
-        perror(tokenArray[outIndex]);
+        perror(input[outIndex]);
         exit(EXIT_FAILURE);
       }
       dup2(fdOut, STDOUT_FILENO);
       close(fdOut);
     }
     if(errIndex != INVALID){
-      if((fdErr = open(tokenArray[errIndex], O_CREAT | O_WRONLY | O_TRUNC,
+      if((fdErr = open(input[errIndex], O_CREAT | O_WRONLY | O_TRUNC,
           S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
-        perror(tokenArray[errIndex]);
+        perror(input[errIndex]);
         exit(EXIT_FAILURE);
       }
       dup2(fdErr, STDERR_FILENO);
       close(fdErr);
     }
     // child (new process)
-    execvp(tokenArray[0], tokenArray);
+    execvp(input[0], input);
 
     // print new line if execvp fails (==-1) and exit process
     // these lines will not run unless execvp() has failed
@@ -373,17 +385,17 @@ void executePipe(char** cmd1, char** cmd2){
 /**
  * Purpose:
  *   Checks input tokens for job control tokens
- *     * bg, fg should be at tokenArray[0]
- *     * & should be at tokenArray[numTokens - 1]
+ *     * bg, fg should be at input[0]
+ *     * & should be at input[numTokens - 1]
  * 
  * Args:
- *   tokenArray (char**): Array of tokens from command input
- *   numTokens     (int): Number of tokens in string
+ *   input    (char**): Array of tokens from command input
+ *   numTokens   (int): Number of tokens in string
  * 
  * Returns:
  *   None
  */
-void checkJobControl(char** tokenArray, int numTokens){
+void checkJobControl(char** input, int numTokens){
   const char* BACKGROUND = "&";
   const char* BG_TOKEN = "bg";
   const char* FG_TOKEN = "fg";
@@ -391,15 +403,15 @@ void checkJobControl(char** tokenArray, int numTokens){
   
   // TODO: Add input verification to ensure that bg, fg, & are at expected
   // indices
-  if(!strcmp(tokenArray[0], BG_TOKEN)){
+  if(!strcmp(input[0], BG_TOKEN)){
     // execute bg
     return;
   }
-  else if(!strcmp(tokenArray[0], FG_TOKEN)){
+  else if(!strcmp(input[0], FG_TOKEN)){
     // execute fg
     return;
   }
-  else if(!strcmp(tokenArray[numTokens - BACKGRND_OFFSET], BACKGROUND)){
+  else if(!strcmp(input[numTokens - BACKGRND_OFFSET], BACKGROUND)){
     // execute background
     return;
   }
@@ -435,7 +447,7 @@ void shellLoop(void){
     validInput = checkInput(input, MAX_LINE_LEN, MAX_TOKEN_LEN);
     if(validInput){
       char** pipeArray = splitStrArray(input, PIPE);
-      // checkJobControl(tokenArray, numTokens);
+      // checkJobControl(input, numTokens);
       if(pipeArray[1] == NULL){
         // no pipe
         char** cmd = splitStrArray(input, SPACE_CHAR);
@@ -458,6 +470,7 @@ void shellLoop(void){
 
         executePipe(cmd1, cmd2);
 
+        // TODO: fix free statements
         // free allocated memory
         // index = 0;
         // int cmd1Freed = 0;
