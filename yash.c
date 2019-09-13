@@ -1,4 +1,5 @@
 #include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,6 +20,37 @@
 // TODO: fix free statements
 // TODO: Refactor into several .c and .h files, separating read, parse, and
 //       execute would be a good place to start
+
+int pidShell = -1;
+int pidPar = -1;
+int pidCh1 = -1;
+int pidCh2 = -1;
+
+/**
+ * Purpose:
+ *   Handler for SIGKILL signal
+ * 
+ * Args:
+ * 
+ * Returns:
+ *   None
+ */
+void sigintHandler(int sigNum){
+
+}
+
+/**
+ * Purpose:
+ *   Handler for SIGTSTP signal
+ * 
+ * Args:
+ * 
+ * Returns:
+ *   None
+ */
+void sigtstpHandler(int sigNum){
+
+}
 
 /** 
  * Purpose:
@@ -213,19 +245,24 @@ void redirectFile(char** input){
  *   None
  */
 void executeGeneral(char** input){
-  const int INVALID = -1;
   const char NEW_LINE = '\n';
-  int child;
+  // int pidCh1;
   int status;
 
-  child = fork();
-  if (child < 0) {
+  pidCh1 = fork();
+  if (pidCh1 < 0) {
     // fork failed; exit
     fprintf(stderr, "Fork failed\n");
     exit(EXIT_FAILURE);
   }
-  else if (child == 0) {
+  else if (pidCh1 == 0) {
     // child (new process)
+    if (signal(SIGINT, sigintHandler) == SIG_ERR){
+	    printf("signal(SIGINT) error");
+    }
+    if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
+    	printf("signal(SIGTSTP) error");
+    } 
     redirectFile(input);
     execvp(input[0], input);
 
@@ -235,7 +272,7 @@ void executeGeneral(char** input){
   }
   else {
     // parent goes down this path (main)
-    wait(&status);
+    waitpid(-1, &status, WCONTINUED | WUNTRACED);
   } 
 }
 
@@ -251,24 +288,29 @@ void executeGeneral(char** input){
  *   None
  */
 void executePipe(char** cmd1, char** cmd2){
-  const int INVALID = -1;
   const char NEW_LINE = '\n';
-  int child1;
-  int child2;
+  // int pidCh1;
+  // int pidCh2;
   int status1;
   int status2;
 
   int pfd[2];
   pipe(pfd);
 
-  child1 = fork();
-  if (child1 < 0) {
+  pidCh1 = fork();
+  if (pidCh1 < 0) {
     // fork failed; exit
     fprintf(stderr, "Fork failed\n");
     exit(EXIT_FAILURE);
   }
-  else if (child1 == 0){
+  else if (pidCh1 == 0){
     // child 1 (new process)
+    if (signal(SIGINT, sigintHandler) == SIG_ERR){
+	    printf("signal(SIGINT) error");
+    }
+    if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
+    	printf("signal(SIGTSTP) error");
+    } 
     dup2(pfd[1], 1);
     close(pfd[0]);
     redirectFile(cmd1);
@@ -279,14 +321,20 @@ void executePipe(char** cmd1, char** cmd2){
     exit(EXIT_FAILURE);
   }
 
-  child2 = fork();
-  if (child2 < 0) {
+  pidCh2 = fork();
+  if (pidCh2 < 0) {
     // fork failed; exit
     fprintf(stderr, "Fork failed\n");
     exit(EXIT_FAILURE);
   }
-  else if (child2 == 0){
+  else if (pidCh2 == 0){
     // child 2 (new process)
+    if (signal(SIGINT, sigintHandler) == SIG_ERR){
+	    printf("signal(SIGINT) error");
+    }
+    if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
+    	printf("signal(SIGTSTP) error");
+    } 
     dup2(pfd[0], 0);
     close(pfd[1]);
     redirectFile(cmd2);
@@ -299,8 +347,8 @@ void executePipe(char** cmd1, char** cmd2){
   // parent goes down this path (main)
   close(pfd[0]);
   close(pfd[1]);
-  wait(&status1);
-  wait(&status2);
+  waitpid(-1, &status1, WCONTINUED | WUNTRACED);
+  waitpid(-1, &status2, WCONTINUED | WUNTRACED);
 }
 
 /**
@@ -358,9 +406,16 @@ void shellLoop(void){
   const int MAX_LINE_LEN = 2001;
   const int MAX_TOKEN_LEN = 31;
   int validInput = 0;
-  int index = 0;
+
+  // index for freeing memory
+  // int index = 0;
   
   char* input;
+
+  // Reset pid's
+  pidShell = getpid();
+  pidCh1 = -1;
+  pidCh2 = -1;
   
   while(input = readline(PROMPT)){
     validInput = checkInput(input, MAX_LINE_LEN, MAX_TOKEN_LEN);
