@@ -448,6 +448,7 @@ void shellLoop(void){
           free(cmd[index]);
           index++;
         }
+        free(cmd[index]);
         free(cmd);
       }
       else{
@@ -458,27 +459,22 @@ void shellLoop(void){
         executePipe(cmd1, cmd2);
 
         // free allocated memory
-        index = 0;
-        while(cmd1[index] != NULL){
-          free(cmd1[index]);
-          index++;
-        }
-        free(cmd1);
-
-        index = 0;
-        while(cmd2[index] != NULL){
-          free(cmd2[index]);
-          index++;
-        }
-        free(cmd2);
-
-        index = 0;
-        while(pipeArray[index] != NULL){
-          free(pipeArray[index]);
-          index++;
-        }
-        free(pipeArray);
+        // index = 0;
+        // int cmd1Freed = 0;
+        // int cmd2Freed = 0;
+        // while((cmd1[index] != NULL) || (cmd2[index] != NULL)){
+        //   if((cmd1[index] != NULL) && !cmd1Freed){
+        //     free(cmd1[index]);
+        //   }
+        //   if((cmd2[index] != NULL) && !cmd2Freed){
+        //     free(cmd2[index]);
+        //   }
+        //   index++;
+        // }
+        // free(cmd1);
+        // free(cmd2);
       }
+      // free(pipeArray);
     }
     else{
       printf("%c", NEW_LINE);
