@@ -153,11 +153,49 @@ void changeRedirToks(char** input, int* inIndex, int* outIndex, int* errIndex){
  *   Handle file redirect statements
  * 
  * Args:
+ *  input (char**): input command
  *   
  * Returns:
  * 
  */
-void redirectFile(){
+void redirectFile(char** input){
+  const int INVALID = -1;
+  int inIndex = -1;
+  int outIndex = -1;
+  int errIndex = -1;
+  int fdIn;
+  int fdOut;
+  int fdErr;
+
+  changeRedirToks(input, &inIndex, &outIndex, &errIndex);
+
+  if(inIndex != INVALID){
+    if((fdIn = open(input[inIndex], O_RDONLY, 0)) == INVALID){
+        perror(input[inIndex]);
+        exit(EXIT_FAILURE);
+    }
+    dup2(fdIn, STDIN_FILENO);
+    close(fdIn);
+  }
+  if(outIndex != INVALID){
+    if((fdOut = open(input[outIndex], O_CREAT | O_WRONLY | O_TRUNC,
+        S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
+      perror(input[outIndex]);
+      exit(EXIT_FAILURE);
+    }
+    dup2(fdOut, STDOUT_FILENO);
+    close(fdOut);
+  }
+  if(errIndex != INVALID){
+    if((fdErr = open(input[errIndex], O_CREAT | O_WRONLY | O_TRUNC,
+        S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
+      perror(input[errIndex]);
+      exit(EXIT_FAILURE);
+    }
+    dup2(fdErr, STDERR_FILENO);
+    close(fdErr);
+  }
+
   return;
 }
 
@@ -172,61 +210,24 @@ void redirectFile(){
  *   None
  */
 void executeGeneral(char** input){
-  // TODO: Implement piping
   // TODO: Implement job control
   const int INVALID = -1;
   const char NEW_LINE = '\n';
-  int inIndex = -1;
-  int outIndex = -1;
-  int errIndex = -1;
-  int fdIn;
-  int fdOut;
-  int fdErr;
+  int child;
   int status;
 
-  int child = fork();
+  child = fork();
   if (child < 0) {
     // fork failed; exit
     fprintf(stderr, "Fork failed\n");
     exit(EXIT_FAILURE);
   }
   else if (child == 0) {
-    inIndex = -1;
-    outIndex = -1;
-    errIndex = -1;
-    changeRedirToks(input, &inIndex, &outIndex, &errIndex);
-
-    if(inIndex != INVALID){
-      if((fdIn = open(input[inIndex], O_RDONLY, 0)) == INVALID){
-          perror(input[inIndex]);
-          exit(EXIT_FAILURE);
-      }
-      dup2(fdIn, STDIN_FILENO);
-      close(fdIn);
-    }
-    if(outIndex != INVALID){
-      if((fdOut = open(input[outIndex], O_CREAT | O_WRONLY | O_TRUNC,
-          S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
-        perror(input[outIndex]);
-        exit(EXIT_FAILURE);
-      }
-      dup2(fdOut, STDOUT_FILENO);
-      close(fdOut);
-    }
-    if(errIndex != INVALID){
-      if((fdErr = open(input[errIndex], O_CREAT | O_WRONLY | O_TRUNC,
-          S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
-        perror(input[errIndex]);
-        exit(EXIT_FAILURE);
-      }
-      dup2(fdErr, STDERR_FILENO);
-      close(fdErr);
-    }
     // child (new process)
+    redirectFile(input);
     execvp(input[0], input);
 
-    // print new line if execvp fails (==-1) and exit process
-    // these lines will not run unless execvp() has failed
+    fprintf(stderr, "Exec failed\n");
     printf("%c", NEW_LINE);
     exit(EXIT_FAILURE);
   }
@@ -249,7 +250,6 @@ void executeGeneral(char** input){
  *   None
  */
 void executePipe(char** cmd1, char** cmd2){
-  // TODO: Implement piping
   // TODO: Implement job control
   const int INVALID = -1;
   const char NEW_LINE = '\n';
@@ -257,12 +257,6 @@ void executePipe(char** cmd1, char** cmd2){
   int child2;
   int status1;
   int status2;
-  int inIndex;
-  int outIndex;
-  int errIndex;
-  int fdIn;
-  int fdOut;
-  int fdErr;
 
   int pfd[2];
   pipe(pfd);
@@ -274,43 +268,10 @@ void executePipe(char** cmd1, char** cmd2){
     exit(EXIT_FAILURE);
   }
   else if (child1 == 0){
-    // file redir
-    inIndex = -1;
-    outIndex = -1;
-    errIndex = -1;
-    changeRedirToks(cmd1, &inIndex, &outIndex, &errIndex);
-    if(inIndex != INVALID){
-      if((fdIn = open(cmd1[inIndex], O_RDONLY, 0)) == INVALID){
-          perror(cmd1[inIndex]);
-          exit(EXIT_FAILURE);
-      }
-      dup2(fdIn, STDIN_FILENO);
-      close(fdIn);
-    }
-    if(outIndex != INVALID){
-      if((fdOut = open(cmd1[outIndex], O_CREAT | O_WRONLY | O_TRUNC,
-          S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
-        perror(cmd1[outIndex]);
-        exit(EXIT_FAILURE);
-      }
-      dup2(fdOut, STDOUT_FILENO);
-      close(fdOut);
-    }
-    if(errIndex != INVALID){
-      if((fdErr = open(cmd1[errIndex], O_CREAT | O_WRONLY | O_TRUNC,
-          S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
-        perror(cmd1[errIndex]);
-        exit(EXIT_FAILURE);
-      }
-      dup2(fdErr, STDERR_FILENO);
-      close(fdErr);
-    }
-
-    // piping
+    // child1
+    redirectFile(cmd1);
     dup2(pfd[1], 1);
     close(pfd[0]);
-
-    // child (new process)
     execvp(cmd1[0], cmd1);
 
     fprintf(stderr, "Exec failed\n");
@@ -329,39 +290,7 @@ void executePipe(char** cmd1, char** cmd2){
       exit(EXIT_FAILURE);
     }
     else if (child2 == 0) {
-      inIndex = -1;
-      outIndex = -1;
-      errIndex = -1;
-      changeRedirToks(cmd2, &inIndex, &outIndex, &errIndex);
-      
-      if(inIndex != INVALID){
-        if((fdIn = open(cmd2[inIndex], O_RDONLY, 0)) == INVALID){
-            perror(cmd2[inIndex]);
-            exit(EXIT_FAILURE);
-        }
-        dup2(fdIn, STDIN_FILENO);
-        close(fdIn);
-      }
-      if(outIndex != INVALID){
-        if((fdOut = open(cmd2[outIndex], O_CREAT | O_WRONLY | O_TRUNC,
-            S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
-          perror(cmd2[outIndex]);
-          exit(EXIT_FAILURE);
-        }
-        dup2(fdOut, STDOUT_FILENO);
-        close(fdOut);
-      }
-      if(errIndex != INVALID){
-        if((fdErr = open(cmd2[errIndex], O_CREAT | O_WRONLY | O_TRUNC,
-            S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
-          perror(cmd2[errIndex]);
-          exit(EXIT_FAILURE);
-        }
-        dup2(fdErr, STDERR_FILENO);
-        close(fdErr);
-      }
-
-      // piping
+      redirectFile(cmd2);
       dup2(pfd[0], 0);
       close(pfd[1]);
 
@@ -454,14 +383,15 @@ void shellLoop(void){
 
         executeGeneral(cmd);
 
+        // TODO: fix memory free
         // free allocated memory
-        index = 0;
-        while(cmd[index] != NULL){
-          free(cmd[index]);
-          index++;
-        }
-        free(cmd[index]);
-        free(cmd);
+        // index = 0;
+        // while(cmd[index] != NULL){
+        //   free(cmd[index]);
+        //   index++;
+        // }
+        // free(cmd[index]);
+        // free(cmd);
       }
       else{
         // pipe exists
