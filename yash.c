@@ -505,19 +505,34 @@ int popNode(JobNode_t** head){
 void printStack(JobNode_t** head){
   const int RUN_VAL = 0;
   const int STOPPED_VAL = 1;
+  const char CURRENT = '+';
+  const char BACK = '-';
 
   const char* RUN_TXT = "RUNNING";
   const char* STOP_TXT = "STOPPED";
   const char* status;
+  char currentJob;
+  
   JobNode_t* temp = *head;
+  int currentID = temp->jobId;
+
   while(temp != NULL){
+    if(temp->jobId == currentID){
+      currentJob = CURRENT;
+    }
+    else{
+      currentJob = BACK;
+    }
+
     if(temp->status == RUN_VAL){
       status = RUN_TXT;
     }
     else if(temp->status == STOPPED_VAL){
       status = STOP_TXT;
     }
-    printf("[%d] %s %s \n", temp->jobId, status, temp->jobStr);
+
+    printf("[%d] %c %s         %s \n", temp->jobId, currentJob, status,
+           temp->jobStr);
     temp = temp->next;
   }
   return;
