@@ -14,6 +14,7 @@
 // https://docs.google.com/document/d/1LBMJslvYvw59uZ_8DNiiPzsp0heW3qesaalOo31IGYg/edit
 
 // TODO: Implement job control
+// TODO: Investigate WNOHANG waitpid flag
 // TODO: Add function to ensure file redir goes to a file e.g.:# cat hello.txt >
 // TODO: Add function to ensure pipe goes to a valid command e.g.:# ls |
 // TODO: Add input verification to ensure that bg, fg, & are at expected indices
@@ -56,6 +57,13 @@ static void sigintHandler(int sigNum){
   }
   return;
 }
+
+struct Job{
+  int jobId;
+  pid_t pgid;
+  char* jobStr;
+  char* status; // or enum
+};
 
 /**
  * Purpose:
@@ -280,7 +288,6 @@ void redirectFile(char** input){
  */
 void executeGeneral(char** input){
   const char NEW_LINE = '\n';
-  // int pidCh1;
   int status;
 
   pidCh1 = fork();
@@ -296,7 +303,10 @@ void executeGeneral(char** input){
     }
     if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
     	printf("signal(SIGTSTP) error");
-    } 
+    }
+    setpgid(0,0);
+    // tcsetpgrp(0, getpid());
+    // tcsetpgrp(1, getpid());
     redirectFile(input);
     execvp(input[0], input);
 
@@ -304,11 +314,14 @@ void executeGeneral(char** input){
     printf("%c", NEW_LINE);
     exit(EXIT_FAILURE);
   }
-  else {
-    // parent goes down this path (main)
-    waitpid(-1, &status, WCONTINUED | WUNTRACED);
-    pidCh1 = -1;
-  } 
+  // parent goes down this path (main)
+  setpgid(pidCh1, pidCh1);
+  // tcsetpgrp(0, pidCh1);
+  // tcsetpgrp(1, pidCh1);
+  waitpid (pidCh1, &status, WCONTINUED | WUNTRACED);
+  pidCh1 = -1;
+  // tcsetpgrp(0, getpid());
+  // tcsetpgrp(1, getpid());
 }
 
 /**
@@ -396,31 +409,40 @@ void executePipe(char** cmd1, char** cmd2){
  * 
  * Args:
  *   input    (char**): Array of tokens from command input
- *   numTokens   (int): Number of tokens in string
  * 
  * Returns:
  *   None
  */
-void checkJobControl(char** input, int numTokens){
+void checkJobControl(char** input){
   const char* BACKGROUND = "&";
-  const char* BG_TOKEN = "bg";
-  const char* FG_TOKEN = "fg";
-  const int BACKGRND_OFFSET = 2;
-  
-  if(!strcmp(input[0], BG_TOKEN)){
+  const char* BG_TOK = "bg";
+  const char* FG_TOK = "fg";
+  const char* JOBS_TOK = "jobs";
+
+  int lastIndex = 0;
+  while(input[lastIndex] != NULL){
+    lastIndex++;
+  }
+  lastIndex--;
+
+  if(!strcmp(input[0], JOBS_TOK)){
+    // execute jobs list
+    return;
+  } 
+  else if(!strcmp(input[0], BG_TOK)){
     // execute bg
     return;
   }
-  else if(!strcmp(input[0], FG_TOKEN)){
+  else if(!strcmp(input[0], FG_TOK)){
     // execute fg
     return;
   }
-  else if(!strcmp(input[numTokens - BACKGRND_OFFSET], BACKGROUND)){
+  else if(!strcmp(input[lastIndex], BACKGROUND)){
     // execute background
     return;
   }
   else{
-    // ??
+    // execute normally
     return;
   }
 }
