@@ -540,17 +540,18 @@ void printStack(JobNode_t** head){
 
 /**
  * Purpose:
- *   Checks input tokens for job control tokens
+ *   Manages jobs based on user input
  *     * bg, fg should be at input[0]
  *     * & should be at input[numTokens - 1]
  * 
  * Args:
- *   input    (char**): Array of tokens from command input
+ *   input     (char**): Array of tokens from command input
+ *   head (JobNode_t**): Pointer to stack head pointer
  * 
  * Returns:
  *   None
  */
-void checkJobControl(char** input){
+void manageJobs(char** input, JobNode_t** head){
   const char* BACKGROUND = "&";
   const char* BG_TOK = "bg";
   const char* FG_TOK = "fg";
@@ -564,18 +565,23 @@ void checkJobControl(char** input){
 
   if(!strcmp(input[0], JOBS_TOK)){
     // execute jobs list
+    printf("RUNNING JOBS\n");
+    printStack(head);
     return;
   } 
   else if(!strcmp(input[0], BG_TOK)){
     // execute bg
+    printf("RUNNING BG\n");
     return;
   }
   else if(!strcmp(input[0], FG_TOK)){
     // execute fg
+    printf("RUNNING FG\n");
     return;
   }
   else if(!strcmp(input[lastIndex], BACKGROUND)){
     // execute background
+    printf("RUNNING &\n");
     return;
   }
   else{
@@ -603,9 +609,14 @@ void shellLoop(void){
   const int MAX_TOKEN_LEN = 31;
   int validInput = 0;
 
-  // index for freeing memory
+  // index for memory frees
   // int index = 0;
   
+  // Initialize job control stack
+  JobNode_t* nullEntry = NULL;
+  JobNode_t** jobStack = (JobNode_t*)malloc(sizeof(JobNode_t*));
+  *jobStack = nullEntry;
+
   char* input;
 
   // Reset pid's
@@ -631,11 +642,11 @@ void shellLoop(void){
     if(validInput){
       // TODO: fix free statements
       char** pipeArray = splitStrArray(input, PIPE);
-      // checkJobControl(input, numTokens);
       if(pipeArray[1] == NULL){
         // no pipe
         char** cmd = splitStrArray(input, SPACE_CHAR);
 
+        manageJobs(cmd);
         executeGeneral(cmd);
 
         // free allocated memory
