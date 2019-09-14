@@ -21,8 +21,6 @@
 // TODO: Refactor into several .c and .h files, separating read, parse, and
 //       execute would be a good place to start
 
-int pidShell = -1;
-int pidPar = -1;
 int pidCh1 = -1;
 int pidCh2 = -1;
 
@@ -40,7 +38,6 @@ static void sigintHandler(int sigNum){
   const char* PROMPT = "# ";
 	printf("\n");
   printf("PID: %d\n", getpid());
-  printf("shell pid: %d\n", pidShell);
   printf("child1 pid: %d\n", pidCh1);
   printf("child2 pid: %d\n", pidCh2);
 	if(pidCh2 != -1){
@@ -53,7 +50,7 @@ static void sigintHandler(int sigNum){
     kill(pidCh1, SIGINT);
     pidCh1 = -1;
 	}
-  else if(getpid() == pidShell){
+  else{
     printf("%s", PROMPT);
 		return;
   }
@@ -83,7 +80,7 @@ void sigtstpHandler(int sigNum){
     kill(pidCh1, SIGINT);
     pidCh1 = -1;
 	}
-  else if(getpid() == pidShell){
+  else{
 		printf("%s", PROMPT);
   }
   return;
@@ -453,18 +450,20 @@ void shellLoop(void){
   char* input;
 
   // Reset pid's
-  pidShell = getpid();
   pidCh1 = -1;
   pidCh2 = -1;
 
-  if (signal(SIGINT, sigintHandler) == SIG_ERR){
-    printf("signal(SIGINT) error");
-  }
-  if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
-    printf("signal(SIGTSTP) error");
-  } 
-  
+  // Block signals outside of shell
+  signal(SIGINT, SIG_IGN);
+  signal(SIGTSTP, SIG_IGN);
+
   while(input = readline(PROMPT)){
+    if (signal(SIGINT, sigintHandler) == SIG_ERR){
+      printf("signal(SIGINT) error");
+    }
+    if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
+      printf("signal(SIGTSTP) error");
+    } 
     printf("***\n1: %d\n", pidCh1);
     printf("2: %d\n***\n", pidCh2);
     validInput = checkInput(input, MAX_LINE_LEN, MAX_TOKEN_LEN);
