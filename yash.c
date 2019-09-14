@@ -582,6 +582,7 @@ void manageJobs(char** input, JobNode_t** head){
   else if(!strcmp(input[lastIndex], BACKGROUND)){
     // execute background
     printf("RUNNING &\n");
+    input[lastIndex] = NULL;
     return;
   }
   else{
@@ -646,7 +647,7 @@ void shellLoop(void){
         // no pipe
         char** cmd = splitStrArray(input, SPACE_CHAR);
 
-        manageJobs(cmd);
+        manageJobs(cmd, jobStack);
         executeGeneral(cmd);
 
         // free allocated memory
