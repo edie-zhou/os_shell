@@ -13,12 +13,6 @@
 // Directions here:
 // https://docs.google.com/document/d/1LBMJslvYvw59uZ_8DNiiPzsp0heW3qesaalOo31IGYg/edit
 
-// TODO: Implement job control
-// TODO: Investigate WNOHANG waitpid flag
-// TODO: Add function to ensure file redir goes to a file e.g.:# cat hello.txt >
-// TODO: Add function to ensure pipe goes to a valid command e.g.:# ls |
-// TODO: Add input verification to ensure that bg, fg, & are at expected indices
-// TODO: fix free statements
 // TODO: Refactor into several .c and .h files, separating read, parse, and
 //       execute would be a good place to start
 
@@ -76,8 +70,9 @@ struct Job{
  *   None
  */
 void sigtstpHandler(int sigNum){
+  // TODO: Change handler to background process instead of killing
   const char* PROMPT = "# ";
-  printf("\n");
+  printf("\n SIGTSTP ACTIVATED\n");
 	if(pidCh2 != -1){
 		kill(pidCh2, SIGINT);
     pidCh2 = -1;
@@ -141,6 +136,9 @@ int checkTokens(char* input, int maxLineLen, int maxTokenLen){
  *   (int): Returns 1 if string is valid, 0 if string is invalid
  */
 int checkInput(char* input, int maxLineLen, int maxTokenLen){
+  // TODO: Add function to ensure file redir goes to a file e.g.:# cat hello.txt >
+  // TODO: Add function to ensure pipe goes to a valid command e.g.:# ls |
+  // TODO: Add input verification to ensure that bg, fg, & are at expected indices
   const int INVALID = 0;
   const int VALID = 1;
   if(strlen(input) > maxLineLen + 1){
@@ -282,11 +280,14 @@ void redirectFile(char** input){
  * 
  * Args: 
  *   input (char**): Token array from command input
+ *   bg       (int): Boolean var for background status
  * 
  * Returns:
  *   None
  */
 void executeGeneral(char** input){
+  // TODO: Implement job control
+  // TODO: Investigate WNOHANG waitpid flag
   const char NEW_LINE = '\n';
   int status;
 
@@ -304,7 +305,8 @@ void executeGeneral(char** input){
     if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
     	printf("signal(SIGTSTP) error");
     }
-    setpgid(0,0);
+
+    // setpgid(0,0);
     // tcsetpgrp(0, getpid());
     // tcsetpgrp(1, getpid());
     redirectFile(input);
@@ -315,7 +317,7 @@ void executeGeneral(char** input){
     exit(EXIT_FAILURE);
   }
   // parent goes down this path (main)
-  setpgid(pidCh1, pidCh1);
+  // setpgid(pidCh1, pidCh1);
   // tcsetpgrp(0, pidCh1);
   // tcsetpgrp(1, pidCh1);
   waitpid (pidCh1, &status, WCONTINUED | WUNTRACED);
@@ -478,6 +480,8 @@ void shellLoop(void){
   // Block signals outside of shell
   signal(SIGINT, SIG_IGN);
   signal(SIGTSTP, SIG_IGN);
+  signal(SIGTTIN, SIG_IGN);
+  signal(SIGTTOU, SIG_IGN);
 
   while(input = readline(PROMPT)){
     if (signal(SIGINT, sigintHandler) == SIG_ERR){
@@ -490,6 +494,7 @@ void shellLoop(void){
     printf("2: %d\n***\n", pidCh2);
     validInput = checkInput(input, MAX_LINE_LEN, MAX_TOKEN_LEN);
     if(validInput){
+      // TODO: fix free statements
       char** pipeArray = splitStrArray(input, PIPE);
       // checkJobControl(input, numTokens);
       if(pipeArray[1] == NULL){
