@@ -18,76 +18,11 @@
 
 int pidCh1 = -1;
 int pidCh2 = -1;
+int stopped = -1;
 
-/**
- * Purpose:
- *   Handler for SIGKILL signal
- * 
- * Args:
- *   sigNum (int): Signal number
- * 
- * Returns:
- *   None
- */
-static void sigintHandler(int sigNum){
-  const char* PROMPT = "# ";
-  printf("\nSIGINT\n");
-  printf("PID: %d\n", getpid());
-  printf("child1 pid: %d\n", pidCh1);
-  printf("child2 pid: %d\n", pidCh2);
-	if(pidCh2 != -1){
-		kill(pidCh2, SIGINT);
-    // pidCh2 = -1;
-    kill(pidCh1, SIGINT);
-    // pidCh1 = -1;
-	}
-  else if(pidCh1 != -1){
-    kill(pidCh1, SIGINT);
-    // pidCh1 = -1;
-	}
-  else{
-    printf("%s", PROMPT);
-		return;
-  }
-  // reset handler
-  signal(SIGINT, sigintHandler);
-  return;
-}
-
-/**
- * Purpose:
- *   Handler for SIGTSTP signal
- * 
- * Args:
- *   sigNum (int): Signal number
- * 
- * Returns:
- *   None
- */
-void sigtstpHandler(int sigNum){
-  // TODO: Change handler to background process instead of killing
-  const char* PROMPT = "# ";
-  printf("\nSIGTSTP\n");
-  printf("PID: %d\n", getpid());
-  printf("child1 pid: %d\n", pidCh1);
-  printf("child2 pid: %d\n", pidCh2);
-	if(pidCh2 != -1){
-		kill(pidCh2, SIGTSTP);
-    pidCh2 = -1;
-    kill(pidCh1, SIGTSTP);
-    pidCh1 = -1;
-	}
-  else if(pidCh1 != -1){
-    kill(pidCh1, SIGTSTP);
-    pidCh1 = -1;
-	}
-  else{
-		printf("%s", PROMPT);
-  }
-  // reset handler
-  signal(SIGTSTP, sigtstpHandler);
-  return;
-}
+static void sigintHandler(int sigNum);
+static void sigtstpHandler(int sigNum);
+static void sigchldHandler(int sigNum);
 
 /** 
  * Purpose:
@@ -280,16 +215,17 @@ void redirectFile(char** input){
  * 
  * Args: 
  *   input (char**): Token array from command input
- *   bg       (int): Boolean var for background status
+ *   back     (int): Boolean var indicating background status
  * 
  * Returns:
  *   None
  */
-void executeGeneral(char** input){
+void executeGeneral(char** input, int back){
   // TODO: Implement job control
   // TODO: Investigate WNOHANG waitpid flag
   const char NEW_LINE = '\n';
   int status;
+  int waitID;
 
   pidCh1 = fork();
   if (pidCh1 < 0) {
@@ -305,10 +241,13 @@ void executeGeneral(char** input){
     if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
     	printf("signal(SIGTSTP) error");
     }
+ 
+    if(back) {
+      setpgid(0,0);
+      tcsetpgrp(0, getpid());
+      tcsetpgrp(1, getpid());
+    }
 
-    // setpgid(0,0);
-    // tcsetpgrp(0, getpid());
-    // tcsetpgrp(1, getpid());
     redirectFile(input);
     execvp(input[0], input);
 
@@ -317,13 +256,26 @@ void executeGeneral(char** input){
     exit(EXIT_FAILURE);
   }
   // parent goes down this path (main)
-  // setpgid(pidCh1, pidCh1);
-  // tcsetpgrp(0, pidCh1);
-  // tcsetpgrp(1, pidCh1);
-  waitpid (pidCh1, &status, WCONTINUED | WUNTRACED);
-  pidCh1 = -1;
-  // tcsetpgrp(0, getpid());
-  // tcsetpgrp(1, getpid());
+  if(!back) {
+    // If not background proc, wait to execution completion
+    waitpid (pidCh1, &status, WCONTINUED | WUNTRACED);
+    pidCh1 = -1;
+  }
+  else {
+    // Return to prompt for background process
+    fprintf(stderr, "Starting background process...");
+
+    // Add background job to stack
+
+    setpgid(pidCh1, pidCh1);
+    // tcsetpgrp(0, pidCh1);
+    // tcsetpgrp(1, pidCh1);
+    waitID = waitpid(-1, &status, WNOHANG);
+    // tcsetpgrp(0, getpid());
+    // tcsetpgrp(1, getpid());
+  }
+  
+  
 }
 
 /**
@@ -556,6 +508,7 @@ void manageJobs(char** input, JobNode_t** head){
   const char* BG_TOK = "bg";
   const char* FG_TOK = "fg";
   const char* JOBS_TOK = "jobs";
+  int background = 0;
 
   int lastIndex = 0;
   while(input[lastIndex] != NULL){
@@ -583,12 +536,99 @@ void manageJobs(char** input, JobNode_t** head){
     // execute background
     printf("RUNNING &\n");
     input[lastIndex] = NULL;
+    background = 1;
+    executeGeneral(input, background);
     return;
   }
   else{
     // execute normally
+    background = 0;
+    executeGeneral(input, background);
     return;
   }
+}
+
+/**
+ * Purpose:
+ *   Handler for SIGKILL signal
+ * 
+ * Args:
+ *   sigNum (int): Signal number
+ * 
+ * Returns:
+ *   None
+ */
+static void sigintHandler(int sigNum){
+  const char* PROMPT = "# ";
+  printf("\nSIGINT\n");
+  printf("PID: %d\n", getpid());
+  printf("child1 pid: %d\n", pidCh1);
+  printf("child2 pid: %d\n", pidCh2);
+	if(pidCh2 != -1){
+		kill(pidCh2, SIGINT);
+    // pidCh2 = -1;
+    kill(pidCh1, SIGINT);
+    // pidCh1 = -1;
+	}
+  else if(pidCh1 != -1){
+    kill(pidCh1, SIGINT);
+    // pidCh1 = -1;
+	}
+  else{
+    printf("%s", PROMPT);
+		return;
+  }
+  // reset handler
+  signal(SIGINT, sigintHandler);
+  return;
+}
+
+/**
+ * Purpose:
+ *   Handler for SIGTSTP signal
+ * 
+ * Args:
+ *   sigNum (int): Signal number
+ * 
+ * Returns:
+ *   None
+ */
+static void sigtstpHandler(int sigNum){
+  // TODO: Change handler to background process instead of killing
+  const char* PROMPT = "# ";
+  printf("\nSIGTSTP\n");
+  printf("PID: %d\n", getpid());
+  printf("child1 pid: %d\n", pidCh1);
+  printf("child2 pid: %d\n", pidCh2);
+	if(pidCh2 != -1){
+		kill(pidCh2, SIGTSTP);
+    pidCh2 = -1;
+    kill(pidCh1, SIGTSTP);
+    pidCh1 = -1;
+	}
+  else if(pidCh1 != -1){
+    kill(pidCh1, SIGTSTP);
+    pidCh1 = -1;
+	}
+  else{
+		printf("%s", PROMPT);
+  }
+  // reset handler
+  signal(SIGTSTP, sigtstpHandler);
+  return;
+}
+
+/**
+ * Purpose:
+ *   Handler for SIGCHLD signals
+ * 
+ * Args:
+ * 
+ * Returns:
+ *   None
+ */
+static void sigchldHandler(int sigNum){
+  
 }
 
 /**
@@ -615,7 +655,7 @@ void shellLoop(void){
   
   // Initialize job control stack
   JobNode_t* nullEntry = NULL;
-  JobNode_t** jobStack = (JobNode_t*)malloc(sizeof(JobNode_t*));
+  JobNode_t** jobStack = (JobNode_t**)malloc(sizeof(JobNode_t*));
   *jobStack = nullEntry;
 
   char* input;
@@ -637,6 +677,9 @@ void shellLoop(void){
     if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
       printf("signal(SIGTSTP) error");
     } 
+    if (signal(SIGCHLD, sigchldHandler) == SIG_ERR){
+      printf("signal(SIGCHLD) error");
+    } 
     printf("***\n1: %d\n", pidCh1);
     printf("2: %d\n***\n", pidCh2);
     validInput = checkInput(input, MAX_LINE_LEN, MAX_TOKEN_LEN);
@@ -648,7 +691,6 @@ void shellLoop(void){
         char** cmd = splitStrArray(input, SPACE_CHAR);
 
         manageJobs(cmd, jobStack);
-        executeGeneral(cmd);
 
         // free allocated memory
         // index = 0;
