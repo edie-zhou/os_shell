@@ -32,6 +32,7 @@ int pidCh2 = -1;
 static void sigintHandler(int sigNum){
   const char* PROMPT = "# ";
 	printf("\n");
+  printf("\nSIGINT\n");
   printf("PID: %d\n", getpid());
   printf("child1 pid: %d\n", pidCh1);
   printf("child2 pid: %d\n", pidCh2);
@@ -49,6 +50,8 @@ static void sigintHandler(int sigNum){
     printf("%s", PROMPT);
 		return;
   }
+  // reset handler
+  signal(SIGINT, sigintHandler);
   return;
 }
 
@@ -72,20 +75,25 @@ struct Job{
 void sigtstpHandler(int sigNum){
   // TODO: Change handler to background process instead of killing
   const char* PROMPT = "# ";
-  printf("\n SIGTSTP ACTIVATED\n");
+  printf("\nSIGTSTP\n");
+  printf("PID: %d\n", getpid());
+  printf("child1 pid: %d\n", pidCh1);
+  printf("child2 pid: %d\n", pidCh2);
 	if(pidCh2 != -1){
-		kill(pidCh2, SIGINT);
+		kill(pidCh2, SIGTSTP);
     pidCh2 = -1;
-    kill(pidCh1, SIGINT);
+    kill(pidCh1, SIGTSTP);
     pidCh1 = -1;
 	}
   else if(pidCh1 != -1){
-    kill(pidCh1, SIGINT);
+    kill(pidCh1, SIGTSTP);
     pidCh1 = -1;
 	}
   else{
 		printf("%s", PROMPT);
   }
+  // reset handler
+  signal(SIGTSTP, sigtstpHandler);
   return;
 }
 
