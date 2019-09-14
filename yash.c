@@ -14,8 +14,8 @@
 // https://docs.google.com/document/d/1LBMJslvYvw59uZ_8DNiiPzsp0heW3qesaalOo31IGYg/edit
 
 // TODO: Implement job control
-// TODO: Add function to ensure file redir redirects to a file e.g.:# cat hello.txt >
-// TODO: Add function to ensure pipe pipes to a valid command e.g.:# ls |
+// TODO: Add function to ensure file redir goes to a file e.g.:# cat hello.txt >
+// TODO: Add function to ensure pipe goes to a valid command e.g.:# ls |
 // TODO: Add input verification to ensure that bg, fg, & are at expected indices
 // TODO: fix free statements
 // TODO: Refactor into several .c and .h files, separating read, parse, and
@@ -31,6 +31,7 @@ int pidCh2 = -1;
  *   Handler for SIGKILL signal
  * 
  * Args:
+ *   sigNum (int): Signal number
  * 
  * Returns:
  *   None
@@ -40,17 +41,22 @@ static void sigintHandler(int sigNum){
 	printf("\n");
   printf("PID: %d\n", getpid());
   printf("shell pid: %d\n", pidShell);
-	if(getpid() == pidShell){
-    printf("%s", PROMPT);
-		return;
-  }
-	else if(pidCh2 != -1){
+  printf("child1 pid: %d\n", pidCh1);
+  printf("child2 pid: %d\n", pidCh2);
+	if(pidCh2 != -1){
 		kill(pidCh2, SIGINT);
+    pidCh2 = -1;
     kill(pidCh1, SIGINT);
+    pidCh1 = -1;
 	}
   else if(pidCh1 != -1){
     kill(pidCh1, SIGINT);
+    pidCh1 = -1;
 	}
+  else if(getpid() == pidShell){
+    printf("%s", PROMPT);
+		return;
+  }
   return;
 }
 
@@ -59,6 +65,7 @@ static void sigintHandler(int sigNum){
  *   Handler for SIGTSTP signal
  * 
  * Args:
+ *   sigNum (int): Signal number
  * 
  * Returns:
  *   None
@@ -66,16 +73,19 @@ static void sigintHandler(int sigNum){
 void sigtstpHandler(int sigNum){
   const char* PROMPT = "# ";
   printf("\n");
-	if(getpid() == pidShell){
-		printf("%s", PROMPT);
-  }
-	else if(pidCh2 != -1){
-		kill(pidCh2, SIGTSTP);
-    kill(pidCh1, SIGTSTP);
+	if(pidCh2 != -1){
+		kill(pidCh2, SIGINT);
+    pidCh2 = -1;
+    kill(pidCh1, SIGINT);
+    pidCh1 = -1;
 	}
   else if(pidCh1 != -1){
-    kill(pidCh1, SIGTSTP);
+    kill(pidCh1, SIGINT);
+    pidCh1 = -1;
 	}
+  else if(getpid() == pidShell){
+		printf("%s", PROMPT);
+  }
   return;
 }
 
@@ -215,10 +225,10 @@ void changeRedirToks(char** input, int* inIndex, int* outIndex, int* errIndex){
  *   Handle file redirect statements
  * 
  * Args:
- *  input (char**): input command
+ *   input (char**): input command
  *   
  * Returns:
- * 
+ *   None
  */
 void redirectFile(char** input){
   const int INVALID = -1;
@@ -300,6 +310,7 @@ void executeGeneral(char** input){
   else {
     // parent goes down this path (main)
     waitpid(-1, &status, WCONTINUED | WUNTRACED);
+    pidCh1 = -1;
   } 
 }
 
@@ -375,7 +386,9 @@ void executePipe(char** cmd1, char** cmd2){
   close(pfd[0]);
   close(pfd[1]);
   waitpid(-1, &status1, WCONTINUED | WUNTRACED);
+  pidCh1 = -1;
   waitpid(-1, &status2, WCONTINUED | WUNTRACED);
+  pidCh2 = -1;
 }
 
 /**
@@ -452,6 +465,8 @@ void shellLoop(void){
   } 
   
   while(input = readline(PROMPT)){
+    printf("***\n1: %d\n", pidCh1);
+    printf("2: %d\n***\n", pidCh2);
     validInput = checkInput(input, MAX_LINE_LEN, MAX_TOKEN_LEN);
     if(validInput){
       char** pipeArray = splitStrArray(input, PIPE);
