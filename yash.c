@@ -24,335 +24,6 @@ static void sigintHandler(int sigNum);
 static void sigtstpHandler(int sigNum);
 static void sigchldHandler(int sigNum);
 
-/** 
- * Purpose:
- *   Verify that tokens in input line do not exceed maximum token length
- * 
- * Args:
- *   input      (char*): Input C-string
- *   maxLineLen   (int): Maximum length of input
- *   maxTokenLen  (int): Maximum length of tokens
- * 
- * Returns:
- *   (int): Returns 1 if all tokens are within maximum limit
- */
-int checkTokens(char* input, int maxLineLen, int maxTokenLen){
-  const int VALID = 1;
-  const int INVALID = 0;
-  const char SPACE_CHAR = ' ';
-  int tokenLen = 0;
-  int k = 0;
-  while(k < strlen(input)){
-    if(tokenLen >= maxTokenLen){
-      return INVALID;
-    }
-    else if((tokenLen < maxTokenLen) && (input[k] == SPACE_CHAR)){
-      tokenLen = 0;
-    }
-    else{
-      tokenLen++;
-    }
-    k++;
-  }
-  return VALID;
-}
-
-/**
- * Purpose:
- *   Read in a line of input from stdin and verify that input line length and
- *   token length is valid
- * 
- * Args:
- *   input      (char*): Input C-string
- *   maxLineLen   (int): Maximum length of input
- *   maxTokenLen  (int): Maximum length of tokens
- * 
- * Returns:
- *   (int): Returns 1 if string is valid, 0 if string is invalid
- */
-int checkInput(char* input, int maxLineLen, int maxTokenLen){
-  // TODO: Add function to ensure file redir goes to a file e.g.:# cat hello.txt >
-  // TODO: Add function to ensure pipe goes to a valid command e.g.:# ls |
-  // TODO: Add input verification to ensure that bg, fg, & are at expected indices
-  const int INVALID = 0;
-  const int VALID = 1;
-  if(strlen(input) > maxLineLen + 1){
-    return INVALID;
-  }
-  else if(!checkTokens(input, maxLineLen, maxTokenLen)){
-    return INVALID;
-  }
-  return VALID;
-}
-
-/**
- * Purpose:
- *   Create array of token C-strings from input line split on input delimiter
- * 
- * Args:
- *   input (char*): Pointer to input c-string
- *   delim   (int): Delimiter to split on
- *  
- * Returns:
- *   (char**): Returns array of token c-strings
- * 
- */
-char** splitStrArray(char* input, const char* delim){
-  char** splitted = NULL;
-  int numElements = 0;
-
-  char* token = strtok(input, delim);
-  while(token != NULL){
-    numElements++;
-    splitted = realloc(splitted, numElements * sizeof(char*));
-    splitted[numElements - 1] = token;
-    token = strtok(NULL, delim);
-  }
-
-  // Assign NULL to last index
-  numElements++;
-  splitted = realloc(splitted, numElements * sizeof(char*));
-  splitted[numElements - 1] = 0;
-
-  return splitted;
-}
-
-/**
- * Purpose:
- *   Find indices for input, output, and error redirection in a command and
- *   replace tokens with NULL
- * 
- * Args:
- *   input   (char**): Array of tokens from command input
- *   inIndex   (int*): Index of input redirection token 
- *   outIndex  (int*): Index of output redirection token 
- *   errIndex  (int*): Index of error redirection token 
- *   
- * Returns:
- *   None  
- */ 
-void changeRedirToks(char** input, int* inIndex, int* outIndex, int* errIndex){
-  const char* IN_REDIR = "<";
-  const char* OUT_REDIR = ">";
-  const char* ERR_REDIR = "2>";
-
-  int index = 0;
-  while(input[index] != NULL){
-    if(!strcmp(input[index], IN_REDIR)){
-      *inIndex = index + 1;
-      // Assign NULL to stop exec() from reading file redirection as part of
-      // input
-      input[index] = NULL;
-    }
-    else if(!strcmp(input[index], OUT_REDIR)){
-      *outIndex = index + 1;
-      input[index] = NULL;
-    }
-    else if(!strcmp(input[index], ERR_REDIR)){
-      *errIndex = index + 1;
-      input[index] = NULL;
-    }
-    index++;
-  }
-
-  return;
-}
-
-/**
- * Purpose:
- *   Handle file redirect statements
- * 
- * Args:
- *   input (char**): input command
- *   
- * Returns:
- *   None
- */
-void redirectFile(char** input){
-  const int INVALID = -1;
-  int inIndex = -1;
-  int outIndex = -1;
-  int errIndex = -1;
-  int fdIn;
-  int fdOut;
-  int fdErr;
-
-  changeRedirToks(input, &inIndex, &outIndex, &errIndex);
-
-  if(inIndex != INVALID){
-    if((fdIn = open(input[inIndex], O_RDONLY, 0)) == INVALID){
-        perror(input[inIndex]);
-        exit(EXIT_FAILURE);
-    }
-    dup2(fdIn, STDIN_FILENO);
-    close(fdIn);
-  }
-  if(outIndex != INVALID){
-    if((fdOut = open(input[outIndex], O_CREAT | O_WRONLY | O_TRUNC,
-        S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
-      perror(input[outIndex]);
-      exit(EXIT_FAILURE);
-    }
-    dup2(fdOut, STDOUT_FILENO);
-    close(fdOut);
-  }
-  if(errIndex != INVALID){
-    if((fdErr = open(input[errIndex], O_CREAT | O_WRONLY | O_TRUNC,
-        S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
-      perror(input[errIndex]);
-      exit(EXIT_FAILURE);
-    }
-    dup2(fdErr, STDERR_FILENO);
-    close(fdErr);
-  }
-
-  return;
-}
-
-/**
- * Purpose:
- *   Execute input line with file redirections
- * 
- * Args: 
- *   input (char**): Token array from command input
- *   back     (int): Boolean var indicating background status
- * 
- * Returns:
- *   None
- */
-void executeGeneral(char** input, int back){
-  // TODO: Implement job control
-  // TODO: Investigate WNOHANG waitpid flag
-  const char NEW_LINE = '\n';
-  int status;
-  int waitID;
-
-  pidCh1 = fork();
-  if (pidCh1 < 0) {
-    // fork failed; exit
-    fprintf(stderr, "Fork failed\n");
-    exit(EXIT_FAILURE);
-  }
-  else if (pidCh1 == 0) {
-    // child (new process)
-    if (signal(SIGINT, sigintHandler) == SIG_ERR){
-	    printf("signal(SIGINT) error");
-    }
-    if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
-    	printf("signal(SIGTSTP) error");
-    }
- 
-    if(back) {
-      setpgid(0,0);
-      tcsetpgrp(0, getpid());
-      tcsetpgrp(1, getpid());
-    }
-
-    redirectFile(input);
-    execvp(input[0], input);
-
-    fprintf(stderr, "Exec failed\n");
-    printf("%c", NEW_LINE);
-    exit(EXIT_FAILURE);
-  }
-  // parent goes down this path (main)
-  if(!back) {
-    // If not background proc, wait to execution completion
-    waitpid (pidCh1, &status, WCONTINUED | WUNTRACED);
-    pidCh1 = -1;
-  }
-  else {
-    // Return to prompt for background process
-    fprintf(stderr, "Starting background process...");
-
-    // Add background job to stack
-
-    setpgid(pidCh1, pidCh1);
-    tcsetpgrp(0, pidCh1);
-    tcsetpgrp(1, pidCh1);
-    waitID = waitpid(-1, &status, WNOHANG);
-    tcsetpgrp(0, getpid());
-    tcsetpgrp(1, getpid());
-  }
-}
-
-/**
- * Purpose:
- *   Execute input line with file redirections and pipes
- * 
- * Args: 
- *   cmd1 (char**): Token array for command before pipe
- *   cmd2 (char**): Token array for command after pipe
- * 
- * Returns:
- *   None
- */
-void executePipe(char** cmd1, char** cmd2){
-  const char NEW_LINE = '\n';
-  // int pidCh1;
-  // int pidCh2;
-  int status1;
-  int status2;
-
-  int pfd[2];
-  pipe(pfd);
-
-  pidCh1 = fork();
-  if (pidCh1 < 0) {
-    // fork failed; exit
-    fprintf(stderr, "Fork failed\n");
-    exit(EXIT_FAILURE);
-  }
-  else if (pidCh1 == 0){
-    // child 1 (new process)
-    if (signal(SIGINT, sigintHandler) == SIG_ERR){
-	    printf("signal(SIGINT) error");
-    }
-    if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
-    	printf("signal(SIGTSTP) error");
-    } 
-    dup2(pfd[1], 1);
-    close(pfd[0]);
-    redirectFile(cmd1);
-    execvp(cmd1[0], cmd1);
-
-    fprintf(stderr, "Exec failed\n");
-    printf("%c", NEW_LINE);
-    exit(EXIT_FAILURE);
-  }
-
-  pidCh2 = fork();
-  if (pidCh2 < 0) {
-    // fork failed; exit
-    fprintf(stderr, "Fork failed\n");
-    exit(EXIT_FAILURE);
-  }
-  else if (pidCh2 == 0){
-    // child 2 (new process)
-    if (signal(SIGINT, sigintHandler) == SIG_ERR){
-	    printf("signal(SIGINT) error");
-    }
-    if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
-    	printf("signal(SIGTSTP) error");
-    } 
-    dup2(pfd[0], 0);
-    close(pfd[1]);
-    redirectFile(cmd2);
-    execvp(cmd2[0], cmd2);
-
-    fprintf(stderr, "Exec failed\n");
-    printf("%c", NEW_LINE);
-    exit(EXIT_FAILURE);
-  }
-  // parent goes down this path (main)
-  close(pfd[0]);
-  close(pfd[1]);
-  waitpid(-1, &status1, WCONTINUED | WUNTRACED);
-  pidCh1 = -1;
-  waitpid(-1, &status2, WCONTINUED | WUNTRACED);
-  pidCh2 = -1;
-}
-
 /**
  * JobNode_t struct
  */ 
@@ -493,6 +164,339 @@ void printStack(JobNode_t** head){
   return;
 }
 
+/** 
+ * Purpose:
+ *   Verify that tokens in input line do not exceed maximum token length
+ * 
+ * Args:
+ *   input      (char*): Input C-string
+ *   maxLineLen   (int): Maximum length of input
+ *   maxTokenLen  (int): Maximum length of tokens
+ * 
+ * Returns:
+ *   (int): Returns 1 if all tokens are within maximum limit
+ */
+int checkTokens(char* input, int maxLineLen, int maxTokenLen){
+  const int VALID = 1;
+  const int INVALID = 0;
+  const char SPACE_CHAR = ' ';
+  int tokenLen = 0;
+  int k = 0;
+  while(k < strlen(input)){
+    if(tokenLen >= maxTokenLen){
+      return INVALID;
+    }
+    else if((tokenLen < maxTokenLen) && (input[k] == SPACE_CHAR)){
+      tokenLen = 0;
+    }
+    else{
+      tokenLen++;
+    }
+    k++;
+  }
+  return VALID;
+}
+
+/**
+ * Purpose:
+ *   Read in a line of input from stdin and verify that input line length and
+ *   token length is valid
+ * 
+ * Args:
+ *   input      (char*): Input C-string
+ *   maxLineLen   (int): Maximum length of input
+ *   maxTokenLen  (int): Maximum length of tokens
+ * 
+ * Returns:
+ *   (int): Returns 1 if string is valid, 0 if string is invalid
+ */
+int checkInput(char* input, int maxLineLen, int maxTokenLen){
+  // TODO: Add function to ensure file redir goes to a file e.g.:# cat hello.txt >
+  // TODO: Add function to ensure pipe goes to a valid command e.g.:# ls |
+  // TODO: Add input verification to ensure that bg, fg, & are at expected indices
+  const int INVALID = 0;
+  const int VALID = 1;
+  if(strlen(input) > maxLineLen + 1){
+    return INVALID;
+  }
+  else if(!checkTokens(input, maxLineLen, maxTokenLen)){
+    return INVALID;
+  }
+  return VALID;
+}
+
+/**
+ * Purpose:
+ *   Create array of token C-strings from input line split on input delimiter
+ * 
+ * Args:
+ *   input (char*): Pointer to input c-string
+ *   delim   (int): Delimiter to split on
+ *  
+ * Returns:
+ *   (char**): Returns array of token c-strings
+ * 
+ */
+char** splitStrArray(char* input, const char* delim){
+  const int MAX_LINE_LEN = 2000;
+  char* copy = (char*)malloc(MAX_LINE_LEN * sizeof(char));
+  strcpy(copy, input);
+  
+  char** splitted = NULL;
+  int numElements = 0;
+
+  char* token = strtok(copy, delim);
+  while(token != NULL){
+    numElements++;
+    splitted = realloc(splitted, numElements * sizeof(char*));
+    splitted[numElements - 1] = token;
+    token = strtok(NULL, delim);
+  }
+
+  // Assign NULL to last index
+  numElements++;
+  splitted = realloc(splitted, numElements * sizeof(char*));
+  splitted[numElements - 1] = 0;
+
+  free(copy);
+  return splitted;
+}
+
+/**
+ * Purpose:
+ *   Find indices for input, output, and error redirection in a command and
+ *   replace tokens with NULL
+ * 
+ * Args:
+ *   cmd     (char**): Array of tokens from command
+ *   inIndex   (int*): Index of input redirection token 
+ *   outIndex  (int*): Index of output redirection token 
+ *   errIndex  (int*): Index of error redirection token 
+ *   
+ * Returns:
+ *   None  
+ */ 
+void changeRedirToks(char** cmd, int* inIndex, int* outIndex, int* errIndex){
+  const char* IN_REDIR = "<";
+  const char* OUT_REDIR = ">";
+  const char* ERR_REDIR = "2>";
+
+  int index = 0;
+  while(cmd[index] != NULL){
+    if(!strcmp(cmd[index], IN_REDIR)){
+      *inIndex = index + 1;
+      // Assign NULL to stop exec() from reading file redirection as part of cmd
+      cmd[index] = NULL;
+    }
+    else if(!strcmp(cmd[index], OUT_REDIR)){
+      *outIndex = index + 1;
+      cmd[index] = NULL;
+    }
+    else if(!strcmp(cmd[index], ERR_REDIR)){
+      *errIndex = index + 1;
+      cmd[index] = NULL;
+    }
+    index++;
+  }
+
+  return;
+}
+
+/**
+ * Purpose:
+ *   Handle file redirect statements
+ * 
+ * Args:
+ *   cmd (char**): Command token array
+ *   
+ * Returns:
+ *   None
+ */
+void redirectFile(char** cmd){
+  const int INVALID = -1;
+  int inIndex = -1;
+  int outIndex = -1;
+  int errIndex = -1;
+  int fdIn;
+  int fdOut;
+  int fdErr;
+
+  changeRedirToks(cmd, &inIndex, &outIndex, &errIndex);
+
+  if(inIndex != INVALID){
+    if((fdIn = open(cmd[inIndex], O_RDONLY, 0)) == INVALID){
+        perror(cmd[inIndex]);
+        exit(EXIT_FAILURE);
+    }
+    dup2(fdIn, STDIN_FILENO);
+    close(fdIn);
+  }
+  if(outIndex != INVALID){
+    if((fdOut = open(cmd[outIndex], O_CREAT | O_WRONLY | O_TRUNC,
+        S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
+      perror(cmd[outIndex]);
+      exit(EXIT_FAILURE);
+    }
+    dup2(fdOut, STDOUT_FILENO);
+    close(fdOut);
+  }
+  if(errIndex != INVALID){
+    if((fdErr = open(cmd[errIndex], O_CREAT | O_WRONLY | O_TRUNC,
+        S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
+      perror(cmd[errIndex]);
+      exit(EXIT_FAILURE);
+    }
+    dup2(fdErr, STDERR_FILENO);
+    close(fdErr);
+  }
+
+  return;
+}
+
+/**
+ * Purpose:
+ *   Execute input line with file redirections
+ * 
+ * Args: 
+ *   cmd   (char**): Token array from command input
+ *   head  (char**): Head of job stack
+ *   back     (int): Boolean var indicating background status
+ * 
+ * Returns:
+ *   None
+ */
+void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
+  // TODO: Implement job control
+  // TODO: Investigate WNOHANG waitpid flag
+  const int RUNNING = 0;
+  const char NEW_LINE = '\n';
+  int status;
+  int waitID;
+
+  pidCh1 = fork();
+  if (pidCh1 < 0) {
+    // fork failed; exit
+    fprintf(stderr, "Fork failed\n");
+    exit(EXIT_FAILURE);
+  }
+  else if (pidCh1 == 0) {
+    // child (new process)
+    if (signal(SIGINT, sigintHandler) == SIG_ERR){
+	    printf("signal(SIGINT) error");
+    }
+    if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
+    	printf("signal(SIGTSTP) error");
+    }
+ 
+    if(back) {
+      setpgid(0,0);
+      // tcsetpgrp(0, getpid());
+    }
+
+    redirectFile(cmd);
+    execvp(cmd[0], cmd);
+
+    fprintf(stderr, "Exec failed\n");
+    printf("%c", NEW_LINE);
+    exit(EXIT_FAILURE);
+  }
+  // parent goes down this path (main)
+  if(!back) {
+    // If not background proc, wait to execution completion
+    waitpid (pidCh1, &status, WCONTINUED | WUNTRACED);
+    pidCh1 = -1;
+  }
+  else {
+    // Return to prompt for background process
+    fprintf(stderr, "Starting background process\n");
+
+    // Add background job to stack
+    pushNode(head, input, pidCh1, RUNNING);
+
+    setpgid(pidCh1, pidCh1);
+    // tcsetpgrp(0, pidCh1);
+    waitID = waitpid(-1, &status, WNOHANG);
+    // tcsetpgrp(0, getpid());
+  }
+}
+
+/**
+ * Purpose:
+ *   Execute input line with file redirections and pipes
+ * 
+ * Args: 
+ *   cmd1 (char**): Token array for command before pipe
+ *   cmd2 (char**): Token array for command after pipe
+ * 
+ * Returns:
+ *   None
+ */
+void executePipe(char** cmd1, char** cmd2){
+  const char NEW_LINE = '\n';
+  // int pidCh1;
+  // int pidCh2;
+  int status1;
+  int status2;
+
+  int pfd[2];
+  pipe(pfd);
+
+  pidCh1 = fork();
+  if (pidCh1 < 0) {
+    // fork failed; exit
+    fprintf(stderr, "Fork failed\n");
+    exit(EXIT_FAILURE);
+  }
+  else if (pidCh1 == 0){
+    // child 1 (new process)
+    if (signal(SIGINT, sigintHandler) == SIG_ERR){
+	    printf("signal(SIGINT) error");
+    }
+    if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
+    	printf("signal(SIGTSTP) error");
+    } 
+    dup2(pfd[1], 1);
+    close(pfd[0]);
+    redirectFile(cmd1);
+    execvp(cmd1[0], cmd1);
+
+    fprintf(stderr, "Exec failed\n");
+    printf("%c", NEW_LINE);
+    exit(EXIT_FAILURE);
+  }
+
+  pidCh2 = fork();
+  if (pidCh2 < 0) {
+    // fork failed; exit
+    fprintf(stderr, "Fork failed\n");
+    exit(EXIT_FAILURE);
+  }
+  else if (pidCh2 == 0){
+    // child 2 (new process)
+    if (signal(SIGINT, sigintHandler) == SIG_ERR){
+	    printf("signal(SIGINT) error");
+    }
+    if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
+    	printf("signal(SIGTSTP) error");
+    } 
+    dup2(pfd[0], 0);
+    close(pfd[1]);
+    redirectFile(cmd2);
+    execvp(cmd2[0], cmd2);
+
+    fprintf(stderr, "Exec failed\n");
+    printf("%c", NEW_LINE);
+    exit(EXIT_FAILURE);
+  }
+  // parent goes down this path (main)
+  close(pfd[0]);
+  close(pfd[1]);
+  waitpid(-1, &status1, WCONTINUED | WUNTRACED);
+  pidCh1 = -1;
+  waitpid(-1, &status2, WCONTINUED | WUNTRACED);
+  pidCh2 = -1;
+}
+
 /**
  * Purpose:
  *   Manages jobs based on user input
@@ -500,53 +504,56 @@ void printStack(JobNode_t** head){
  *     * & should be at input[numTokens - 1]
  * 
  * Args:
- *   input     (char**): Array of tokens from command input
+ *   cmd       (char**): Array of tokens from command input
+ *   input      (char*): Input C-string
  *   head (JobNode_t**): Pointer to stack head pointer
  * 
  * Returns:
  *   None
  */
-void manageJobs(char** input, JobNode_t** head){
+void manageJobs(char** cmd, char* input, JobNode_t** head){
   const char* BACKGROUND = "&";
   const char* BG_TOK = "bg";
   const char* FG_TOK = "fg";
   const char* JOBS_TOK = "jobs";
-  int background = 0;
+  int backState = 0;
 
   int lastIndex = 0;
-  while(input[lastIndex] != NULL){
+  while(cmd[lastIndex] != NULL){
     lastIndex++;
   }
   lastIndex--;
 
-  if(!strcmp(input[0], JOBS_TOK)){
+  if(!strcmp(cmd[0], JOBS_TOK)){
     // execute jobs list
     printf("RUNNING JOBS\n");
-    printStack(head);
+    if(head != NULL){
+      printStack(head);
+    }
     return;
   } 
-  else if(!strcmp(input[0], BG_TOK)){
+  else if(!strcmp(cmd[0], BG_TOK)){
     // execute bg
     printf("RUNNING BG\n");
     return;
   }
-  else if(!strcmp(input[0], FG_TOK)){
+  else if(!strcmp(cmd[0], FG_TOK)){
     // execute fg
     printf("RUNNING FG\n");
     return;
   }
-  else if(!strcmp(input[lastIndex], BACKGROUND)){
+  else if(!strcmp(cmd[lastIndex], BACKGROUND)){
     // execute background
     printf("RUNNING &\n");
-    input[lastIndex] = NULL;
-    background = 1;
-    executeGeneral(input, background);
+    cmd[lastIndex] = NULL;
+    backState = 1;
+    executeGeneral(cmd, input, head, backState);
     return;
   }
   else{
     // execute normally
-    background = 0;
-    executeGeneral(input, background);
+    backState = 0;
+    executeGeneral(cmd, input, head, backState);
     return;
   }
 }
@@ -605,13 +612,13 @@ static void sigtstpHandler(int sigNum){
   printf("child2 pid: %d\n", pidCh2);
 	if(pidCh2 != -1){
 		kill(pidCh2, SIGTSTP);
-    pidCh2 = -1;
+    // pidCh2 = -1;
     kill(pidCh1, SIGTSTP);
-    pidCh1 = -1;
+    // pidCh1 = -1;
 	}
   else if(pidCh1 != -1){
     kill(pidCh1, SIGTSTP);
-    pidCh1 = -1;
+    // pidCh1 = -1;
 	}
   else{
 		printf("%s", PROMPT);
@@ -673,6 +680,7 @@ void shellLoop(void){
   signal(SIGTSTP, SIG_IGN);
   signal(SIGTTIN, SIG_IGN);
   signal(SIGTTOU, SIG_IGN);
+  signal(SIGCHLD, SIG_IGN);
 
   while(input = readline(PROMPT)){
     if (signal(SIGINT, sigintHandler) == SIG_ERR){
@@ -694,7 +702,7 @@ void shellLoop(void){
         // no pipe
         char** cmd = splitStrArray(input, SPACE_CHAR);
 
-        manageJobs(cmd, jobStack);
+        manageJobs(cmd, input, jobStack);
 
         // free allocated memory
         // index = 0;
