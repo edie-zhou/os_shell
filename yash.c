@@ -662,7 +662,7 @@ static void sigtstpHandler(int sigNum){
  */
 static void sigchldHandler(int sigNum){
   printf("SIGCHLD EXECUTED\n");
-  signal(SIGCHLD, sigtstpHandler);
+  signal(SIGCHLD, sigchldHandler);
 }
 
 /**
