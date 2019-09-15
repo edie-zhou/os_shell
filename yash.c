@@ -50,13 +50,10 @@ static void sigintHandler(int sigNum){
   printf("child2 pid: %d\n", pidCh2);
 	if (pidCh2 != -1){
 		kill(pidCh2, SIGINT);
-    // pidCh2 = -1;
     kill(pidCh1, SIGINT);
-    // pidCh1 = -1;
 	}
   else if (pidCh1 != -1){
     kill(pidCh1, SIGINT);
-    // pidCh1 = -1;
 	}
   else{
     printf("%s", PROMPT);
@@ -86,13 +83,10 @@ static void sigtstpHandler(int sigNum){
   printf("child2 pid: %d\n", pidCh2);
 	if (pidCh2 != -1){
 		kill(pidCh2, SIGTSTP);
-    // pidCh2 = -1;
     kill(pidCh1, SIGTSTP);
-    // pidCh1 = -1;
 	}
   else if (pidCh1 != -1){
     kill(pidCh1, SIGTSTP);
-    // pidCh1 = -1;
 	}
   else{
 		printf("%s", PROMPT);
@@ -648,7 +642,6 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
     // If not background proc, wait to execution completion
     waitID = waitpid(pidCh1, &status, WCONTINUED | WUNTRACED);
     printf("waitID: %d\n", waitID);
-    // pidCh1 = -1;
   }
   else{
     // Return to prompt for background process
@@ -737,9 +730,7 @@ void executePipe(char** cmd1, char** cmd2){
   close(pfd[0]);
   close(pfd[1]);
   waitpid(-1, &status1, WCONTINUED | WUNTRACED);
-  pidCh1 = -1;
   waitpid(-1, &status2, WCONTINUED | WUNTRACED);
-  pidCh2 = -1;
 }
 
 /**
