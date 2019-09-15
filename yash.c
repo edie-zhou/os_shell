@@ -28,15 +28,94 @@ typedef struct JobNode_t{
   struct JobNode_t* next;
 }JobNode_t;
 
-JobNode_t** jobStack = NULL;
-
 int pidCh1 = -1;
 int pidCh2 = -1;
 int stopped = -1;
 
-static void sigintHandler(int sigNum);
-static void sigtstpHandler(int sigNum);
-static void sigchldHandler(int sigNum);
+/**
+ * Purpose:
+ *   Handler for SIGKILL signal
+ * 
+ * Args:
+ *   sigNum (int): Signal number
+ * 
+ * Returns:
+ *   None
+ */
+static void sigintHandler(int sigNum){
+  const char* PROMPT = "# ";
+  printf("\nSIGINT\n");
+  printf("PID: %d\n", getpid());
+  printf("child1 pid: %d\n", pidCh1);
+  printf("child2 pid: %d\n", pidCh2);
+	if (pidCh2 != -1){
+		kill(pidCh2, SIGINT);
+    // pidCh2 = -1;
+    kill(pidCh1, SIGINT);
+    // pidCh1 = -1;
+	}
+  else if (pidCh1 != -1){
+    kill(pidCh1, SIGINT);
+    // pidCh1 = -1;
+	}
+  else{
+    printf("%s", PROMPT);
+		return;
+  }
+  // reset handler
+  signal(SIGINT, sigintHandler);
+  return;
+}
+
+/**
+ * Purpose:
+ *   Handler for SIGTSTP signal
+ * 
+ * Args:
+ *   sigNum (int): Signal number
+ * 
+ * Returns:
+ *   None
+ */
+static void sigtstpHandler(int sigNum){
+  // TODO: Change handler to background process instead of killing
+  const char* PROMPT = "# ";
+  printf("\nSIGTSTP\n");
+  printf("PID: %d\n", getpid());
+  printf("child1 pid: %d\n", pidCh1);
+  printf("child2 pid: %d\n", pidCh2);
+	if (pidCh2 != -1){
+		kill(pidCh2, SIGTSTP);
+    // pidCh2 = -1;
+    kill(pidCh1, SIGTSTP);
+    // pidCh1 = -1;
+	}
+  else if (pidCh1 != -1){
+    kill(pidCh1, SIGTSTP);
+    // pidCh1 = -1;
+	}
+  else{
+		printf("%s", PROMPT);
+  }
+  // reset handler
+  signal(SIGTSTP, sigtstpHandler);
+  return;
+}
+
+/**
+ * Purpose:
+ *   Handler for SIGCHLD signals
+ * 
+ * Args:
+ * 
+ * Returns:
+ *   None
+ */
+static void sigchldHandler(int sigNum){
+  // printf("\nSIGCHLD EXECUTED\n");
+
+  signal(SIGCHLD, sigchldHandler);
+}
 
 /**
  * Purpose:
@@ -75,7 +154,7 @@ int countNodes(JobNode_t** head){
 void pushNode(JobNode_t** head, char* jobStr, int pgid, int status){
   JobNode_t* curr = (JobNode_t*)malloc(sizeof(JobNode_t));
 
-  curr->jobStr = (char*)malloc(2001*sizeof(char));
+  curr->jobStr = (char*)malloc(2001 * sizeof(char));
   strcpy(curr->jobStr, jobStr);
   curr->pgid = pgid;
   if (*head == NULL){
@@ -86,11 +165,7 @@ void pushNode(JobNode_t** head, char* jobStr, int pgid, int status){
   }  
   curr->status = status;
   curr->next = *head;
-  printf("HEAD: %p\n", *head);
-  printf("CURR: %p\n", curr);
   *head = curr;
-  printf("NEW HEAD: %p\n", *head);
-
   return;
 }
 
@@ -152,12 +227,41 @@ void checkDoneJobs(JobNode_t** head){
  *   Print completed jobs
  * 
  * Args:
+ *   head (JobNode_t**): Pointer to job stack head pointer
  * 
  * Returns:
  *   None
  */
-void printDoneJobs(){
+void printDoneJobs(JobNode_t** head){
+  const int DONE_VAL = 2;
+  const char CURRENT = '+';
+  const char BACK = '-';
+  const char* DONE_TXT = "DONE";
 
+  char currentJob;
+  int currentJobID;
+  
+  JobNode_t* curr = *head;
+  if(curr != NULL){
+    currentJobID = curr->jobId;
+  }
+
+  while(curr != NULL){
+    if (curr->jobId == currentJobID){
+      currentJob = CURRENT;
+    }
+    else{
+      currentJob = BACK;
+    }
+
+    if (curr->status == DONE_VAL){
+      printf("[%d] %c %s         %s \n", curr->jobId, currentJob, DONE_TXT,
+             curr->jobStr);
+    }
+
+    curr = curr->next;
+  }
+  return;
 }
 
 /**
@@ -171,17 +275,16 @@ void printDoneJobs(){
  *   None
  */
 void printStack(JobNode_t** head){
-  printf("PRINT STACK \n");
   const int RUN_VAL = 0;
   const int STOPPED_VAL = 1;
   const int DONE_VAL = 2;
   const char CURRENT = '+';
   const char BACK = '-';
-
   const char* RUN_TXT = "RUNNING";
   const char* STOP_TXT = "STOPPED";
   const char* DONE_TXT = "DONE";
   const char* status;
+
   char currentJob;
   int currentID;
   
@@ -230,6 +333,7 @@ void printStack(JobNode_t** head){
 void changeJobStatus(JobNode_t** head, int pgid, int newStatus){
   JobNode_t* temp = *head;
   int changed = 0;
+
   while((!changed)&&(temp != NULL)){
     if(temp->pgid == pgid){
       changed = 1;
@@ -237,6 +341,7 @@ void changeJobStatus(JobNode_t** head, int pgid, int newStatus){
     }
     temp = temp->next;
   }
+
   return;
 }
 
@@ -252,11 +357,13 @@ void changeJobStatus(JobNode_t** head, int pgid, int newStatus){
  */ 
 void removeDoneJobs(JobNode_t** head){
   const int DONE = 2;
+
   JobNode_t* curr = *head;
   JobNode_t* temp = curr->next;
 
   while((curr != NULL) && (curr->status == DONE)){
     free(curr);
+
     curr = temp;
     if(temp != NULL){
       temp = temp->next;
@@ -264,14 +371,17 @@ void removeDoneJobs(JobNode_t** head){
   }
   if(curr == NULL){
     *head = NULL;
+
     return;
   }
   else{
     *head = curr;
     temp = curr->next;
+
     while(temp != NULL){
       if(temp->status == DONE){
         curr->next = temp->next;
+
         free(temp);
         temp = curr->next;
       }
@@ -281,6 +391,7 @@ void removeDoneJobs(JobNode_t** head){
     
       }
     }
+
     return;
   }
 }
@@ -546,7 +657,6 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
     // Add background job to stack
     pushNode(head, input, pidCh1, RUNNING);
 
-    printf("NEW NEW HEAD: %p\n", *head);
 
     // tcsetpgrp(0, pidCh1);
     // waitID = waitpid(-1, &status, WNOHANG);
@@ -660,12 +770,12 @@ void manageJobs(char** cmd, char* input, JobNode_t** head){
   lastIndex--;
 
   if (strcmp(cmd[0], JOBS_TOK) == 0){
-    // execute jobs list
+    // print job stack
     if ((*head) != NULL){
       printf("RUNNING JOBS\n");
       checkDoneJobs(head);
       printStack(head);
-      removeDoneJobs(jobStack);
+      removeDoneJobs(head);
     }
     return;
   } 
@@ -680,10 +790,17 @@ void manageJobs(char** cmd, char* input, JobNode_t** head){
     return;
   }
   else if (!strcmp(cmd[lastIndex], BACKGROUND)){
-    // execute background
+    // execute in background
     printf("RUNNING &\n");
     cmd[lastIndex] = NULL;
     backState = 1;
+
+    // print done jobs
+    if ((*head) != NULL){
+      checkDoneJobs(head);
+      printDoneJobs(head);
+      removeDoneJobs(head);
+    }
     executeGeneral(cmd, input, head, backState);
     return;
   }
@@ -693,91 +810,6 @@ void manageJobs(char** cmd, char* input, JobNode_t** head){
     executeGeneral(cmd, input, head, backState);
     return;
   }
-}
-
-/**
- * Purpose:
- *   Handler for SIGKILL signal
- * 
- * Args:
- *   sigNum (int): Signal number
- * 
- * Returns:
- *   None
- */
-static void sigintHandler(int sigNum){
-  const char* PROMPT = "# ";
-  printf("\nSIGINT\n");
-  printf("PID: %d\n", getpid());
-  printf("child1 pid: %d\n", pidCh1);
-  printf("child2 pid: %d\n", pidCh2);
-	if (pidCh2 != -1){
-		kill(pidCh2, SIGINT);
-    // pidCh2 = -1;
-    kill(pidCh1, SIGINT);
-    // pidCh1 = -1;
-	}
-  else if (pidCh1 != -1){
-    kill(pidCh1, SIGINT);
-    // pidCh1 = -1;
-	}
-  else{
-    printf("%s", PROMPT);
-		return;
-  }
-  // reset handler
-  signal(SIGINT, sigintHandler);
-  return;
-}
-
-/**
- * Purpose:
- *   Handler for SIGTSTP signal
- * 
- * Args:
- *   sigNum (int): Signal number
- * 
- * Returns:
- *   None
- */
-static void sigtstpHandler(int sigNum){
-  // TODO: Change handler to background process instead of killing
-  const char* PROMPT = "# ";
-  printf("\nSIGTSTP\n");
-  printf("PID: %d\n", getpid());
-  printf("child1 pid: %d\n", pidCh1);
-  printf("child2 pid: %d\n", pidCh2);
-	if (pidCh2 != -1){
-		kill(pidCh2, SIGTSTP);
-    // pidCh2 = -1;
-    kill(pidCh1, SIGTSTP);
-    // pidCh1 = -1;
-	}
-  else if (pidCh1 != -1){
-    kill(pidCh1, SIGTSTP);
-    // pidCh1 = -1;
-	}
-  else{
-		printf("%s", PROMPT);
-  }
-  // reset handler
-  signal(SIGTSTP, sigtstpHandler);
-  return;
-}
-
-/**
- * Purpose:
- *   Handler for SIGCHLD signals
- * 
- * Args:
- * 
- * Returns:
- *   None
- */
-static void sigchldHandler(int sigNum){
-  printf("\nSIGCHLD EXECUTED\n");
-
-  signal(SIGCHLD, sigchldHandler);
 }
 
 /**
@@ -799,6 +831,7 @@ void shellLoop(void){
   int index;
   
   // Initialize job control stack
+  JobNode_t** jobStack = NULL;
   jobStack = (JobNode_t**)malloc(sizeof(JobNode_t*));
   *jobStack = NULL;
 
@@ -824,11 +857,12 @@ void shellLoop(void){
     if (signal(SIGCHLD, sigchldHandler) == SIG_ERR){
       printf("signal(SIGCHLD) error");
     } 
+
     printf("***\n1: %d\n", pidCh1);
     printf("2: %d\n***\n", pidCh2);
+
     validInput = checkInput(input);
     if (validInput){
-      // TODO: fix free statements
       char** pipeArray = splitStrArray(input, PIPE);
       if (pipeArray[1] == NULL){
         // no pipe
