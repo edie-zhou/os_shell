@@ -275,7 +275,6 @@ char** splitStrArray(char* input, const char* delim){
   splitted[numElements - 1] = 0;
 
   free(copy);
-  printf("MALLOCD: %p\n", splitted);
   return splitted;
 }
 
@@ -739,7 +738,18 @@ void shellLoop(void){
 
         executePipe(cmd1, cmd2);
 
+        index = 0;
+        while(cmd1[index] != NULL){
+          free(cmd1[index]);
+          index++;
+        }
         free(cmd1);
+        
+        index = 0;
+        while(cmd2[index] != NULL){
+          free(cmd2[index]);
+          index++;
+        }
         free(cmd2);
       }
       free(pipeArray);
@@ -752,7 +762,6 @@ void shellLoop(void){
 
   // TODO: free jobStack nodes
   free(jobStack);
-
 
   return;
 }
