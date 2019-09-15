@@ -41,7 +41,7 @@ typedef struct JobNode_t{
  *   Count number of nodes in stack
  * 
  * Args:
- *   head (JobNode_t**): Pointer to stack head pointer
+ *   head (JobNode_t**): Pointer to job stack head pointer
  * 
  * Returns:
  *   (int): Number of nodes in stack
@@ -62,7 +62,7 @@ int countNodes(JobNode_t** head){
  *   Push JobNode to background stack
  * 
  * Args:
- *   head  (JobNode_t**): Pointer to stack head pointer
+ *   head  (JobNode_t**): Pointer to job stack head pointer
  *   jobStr      (char*): Job string
  *   pid           (int): Process group id of job
  *   status        (int): Running state of job
@@ -71,22 +71,22 @@ int countNodes(JobNode_t** head){
  *   None
  */ 
 void pushNode(JobNode_t** head, char* jobStr, int pgid, int status){
-  JobNode_t* temp = (JobNode_t*)malloc(sizeof(JobNode_t));
+  JobNode_t* curr = (JobNode_t*)malloc(sizeof(JobNode_t));
 
-  temp->jobStr = (char*)malloc(2001*sizeof(char));
-  strcpy(temp->jobStr, jobStr);
-  temp->pgid = pgid;
+  curr->jobStr = (char*)malloc(2001*sizeof(char));
+  strcpy(curr->jobStr, jobStr);
+  curr->pgid = pgid;
   if (*head == NULL){
-    temp->jobId = 1;
+    curr->jobId = 1;
   }
   else{
-    temp->jobId = (*head)->jobId + 1;
+    curr->jobId = (*head)->jobId + 1;
   }  
-  temp->status = status;
-  temp->next = *head;
+  curr->status = status;
+  curr->next = *head;
   printf("HEAD: %p\n", *head);
-  printf("TEMP: %p\n", temp);
-  *head = temp;
+  printf("CURR: %p\n", curr);
+  *head = curr;
   printf("NEW HEAD: %p\n", *head);
 
   return;
@@ -97,25 +97,25 @@ void pushNode(JobNode_t** head, char* jobStr, int pgid, int status){
  *   Pop JobNode off background stack
  * 
  * Args:
- *   head (JobNode_t**): Pointer to stack head pointer
+ *   head (JobNode_t**): Pointer to job stack head pointer
  *   
  * Returns:
  *   (int): Process group ID, -1 if failed
  */
 int popNode(JobNode_t** head){
   const int INVALID = -1;
-  JobNode_t* temp;
+  JobNode_t* curr;
   int popped;
 
   if (*head == NULL){
     return INVALID;
   }
 
-  temp = (*head)->next;
+  curr = (*head)->next;
   popped = (*head)->pgid;
   free((*head)->jobStr);
   free(*head);
-  *head = temp;
+  *head = curr;
 
   return popped;
 }
@@ -125,7 +125,7 @@ int popNode(JobNode_t** head){
  *   Print stack of background jobs
  * 
  * Args:
- *   head (JobNode_t**): Pointer to stack head pointer
+ *   head (JobNode_t**): Pointer to job stack head pointer
  * 
  * Returns:
  *   None
@@ -134,40 +134,115 @@ void printStack(JobNode_t** head){
   printf("PRINT STACK \n");
   const int RUN_VAL = 0;
   const int STOPPED_VAL = 1;
+  const int DONE_VAL = 2;
   const char CURRENT = '+';
   const char BACK = '-';
 
   const char* RUN_TXT = "RUNNING";
   const char* STOP_TXT = "STOPPED";
+  const char* DONE_TXT = "DONE";
   const char* status;
   char currentJob;
   int currentID;
   
-  JobNode_t* temp = *head;
-  if(temp != NULL){
-    currentID = temp->jobId;
+  JobNode_t* curr = *head;
+  if(curr != NULL){
+    currentID = curr->jobId;
   }
 
-  while(temp != NULL){
-    if (temp->jobId == currentID){
+  while(curr != NULL){
+    if (curr->jobId == currentID){
       currentJob = CURRENT;
     }
     else{
       currentJob = BACK;
     }
 
-    if (temp->status == RUN_VAL){
+    if (curr->status == RUN_VAL){
       status = RUN_TXT;
     }
-    else if (temp->status == STOPPED_VAL){
+    else if (curr->status == STOPPED_VAL){
+      status = STOP_TXT;
+    }
+    else if (curr->status == DONE_VAL){
       status = STOP_TXT;
     }
 
-    printf("[%d] %c %s         %s \n", temp->jobId, currentJob, status,
-           temp->jobStr);
+    printf("[%d] %c %s         %s \n", curr->jobId, currentJob, status,
+           curr->jobStr);
+    curr = curr->next;
+  }
+  return;
+}
+
+/**
+ * Purpose:
+ *   Change running status of job in job stack
+ * 
+ * Args:
+ *   head (JobNode_t**): Pointer to job stack head pointer
+ *   pgid         (int): Process group ID
+ *   newStatus    (int): New running status of process
+ * 
+ * Returns:
+ *   None
+ */ 
+void changeJobStatus(JobNode_t** head, int pgid, int newStatus){
+  JobNode_t* temp = *head;
+  int changed = 0;
+  while((!changed)&&(temp != NULL)){
+    if(temp->pgid == pgid){
+      changed = 1;
+      temp->status = newStatus;
+    }
     temp = temp->next;
   }
   return;
+}
+
+/**
+ * Purpose:
+ *   Change running status of job in job stack
+ * 
+ * Args:
+ *   head (JobNode_t**): Pointer to job stack head pointer
+ * 
+ * Returns:
+ *   None
+ */ 
+void removeDoneJobs(JobNode_t** head){
+  const int DONE = 2;
+  JobNode_t* curr = *head;
+  JobNode_t* temp = curr->next;
+  int changed = 0;
+  while((curr != NULL) && (curr->status == DONE)){
+    free(curr);
+    curr = temp;
+    if(temp != NULL){
+      temp = temp->next;
+    }
+  }
+  if(curr == NULL){
+    *head = NULL;
+    return;
+  }
+  else{
+    *head = curr;
+    temp = curr->next;
+    while(temp != NULL){
+      if(temp->status == DONE){
+        curr->next = temp->next;
+        free(temp);
+        temp = curr->next;
+      }
+      else{
+        curr = temp;
+        temp = temp->next;
+    
+      }
+    }
+    return;
+  }
 }
 
 /** 
@@ -667,7 +742,9 @@ static void sigchldHandler(int sigNum){
   while ((pgid = waitpid(-1, &status, WNOHANG)) != -1){
     printf("PGID: %d\n",pgid);
     printf("%s", PROMPT);
+    // changeJobStatus();
   }
+  // removeDoneJobs();
   signal(SIGCHLD, sigchldHandler);
 }
 
