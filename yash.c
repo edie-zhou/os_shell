@@ -73,7 +73,7 @@ int countNodes(JobNode_t** head){
 void pushNode(JobNode_t** head, char* jobStr, int pgid, int status){
   JobNode_t* temp = (JobNode_t*)malloc(sizeof(JobNode_t));
 
-  temp->jobStr = (char*)malloc(2000*sizeof(char));
+  temp->jobStr = (char*)malloc(2001*sizeof(char));
   strcpy(temp->jobStr, jobStr);
   temp->pgid = pgid;
   if (*head == NULL){
@@ -210,22 +210,22 @@ int checkTokens(char* input, int maxLineLen, int maxTokenLen){
  * 
  * Args:
  *   input      (char*): Input C-string
- *   maxLineLen   (int): Maximum length of input
- *   maxTokenLen  (int): Maximum length of tokens
  * 
  * Returns:
  *   (int): Returns 1 if string is valid, 0 if string is invalid
  */
-int checkInput(char* input, int maxLineLen, int maxTokenLen){
+int checkInput(char* input){
   // TODO: Add function to ensure file redir goes to a file e.g.:# cat hello.txt >
   // TODO: Add function to ensure pipe goes to a valid command e.g.:# ls |
   // TODO: Add input verification to ensure that bg, fg, & are at expected indices
+  const int MAX_LINE_LEN = 2001;
+  const int MAX_TOKEN_LEN = 31;
   const int INVALID = 0;
   const int VALID = 1;
-  if (strlen(input) > maxLineLen + 1){
+  if (strlen(input) > MAX_LINE_LEN){
     return INVALID;
   }
-  else if (!checkTokens(input, maxLineLen, maxTokenLen)){
+  else if (!checkTokens(input, MAX_LINE_LEN, MAX_TOKEN_LEN)){
     return INVALID;
   }
   return VALID;
@@ -686,8 +686,6 @@ void shellLoop(void){
   const char* PIPE = "|";
   const char* SPACE_CHAR = " ";
   const char* PROMPT = "# ";
-  const int MAX_LINE_LEN = 2001;
-  const int MAX_TOKEN_LEN = 31;
   int validInput = 0;
   int index;
   
@@ -720,7 +718,7 @@ void shellLoop(void){
     } 
     printf("***\n1: %d\n", pidCh1);
     printf("2: %d\n***\n", pidCh2);
-    validInput = checkInput(input, MAX_LINE_LEN, MAX_TOKEN_LEN);
+    validInput = checkInput(input);
     if (validInput){
       // TODO: fix free statements
       char** pipeArray = splitStrArray(input, PIPE);
