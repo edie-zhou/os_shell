@@ -71,7 +71,6 @@ int countNodes(JobNode_t** head){
  *   None
  */ 
 void pushNode(JobNode_t** head, char* jobStr, int pgid, int status){
-  printf("PUSHED \n");
   JobNode_t* temp = (JobNode_t*)malloc(sizeof(JobNode_t));
 
   temp->jobStr = (char*)malloc(2000*sizeof(char));
@@ -382,7 +381,7 @@ void redirectFile(char** cmd){
  *   None
  */
 void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
-  // TODO: Implement job control
+  // TODO: (WIP) Implement job control
   // TODO: Investigate WNOHANG waitpid flag
   const int RUNNING = 0;
   const char NEW_LINE = '\n';
@@ -404,10 +403,10 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
     	printf("signal(SIGTSTP) error");
     }
  
-    if (back) {
-      setpgid(0,0);
-      // tcsetpgrp(0, getpid());
-    }
+    setpgid(0,0);
+    // if (back) {
+    //   // tcsetpgrp(0, getpid());
+    // }
 
     redirectFile(cmd);
     execvp(cmd[0], cmd);
@@ -417,10 +416,13 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
     exit(EXIT_FAILURE);
   }
   // parent goes down this path (main)
+  setpgid(pidCh1, pidCh1);
+
   if (!back){
     // If not background proc, wait to execution completion
-    waitpid(pidCh1, &status, WCONTINUED | WUNTRACED);
-    pidCh1 = -1;
+    waitID = waitpid(pidCh1, &status, WCONTINUED | WUNTRACED);
+    printf("waitID: %d\n", waitID);
+    // pidCh1 = -1;
   }
   else{
     // Return to prompt for background process
@@ -431,9 +433,9 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
 
     printf("NEW NEW HEAD: %p\n", *head);
 
-    setpgid(pidCh1, pidCh1);
     // tcsetpgrp(0, pidCh1);
-    waitID = waitpid(-1, &status, WNOHANG);
+    // waitID = waitpid(-1, &status, WNOHANG);
+    // printf("waitID: %d\n", waitID);
     // tcsetpgrp(0, getpid());
   }
 }
@@ -541,10 +543,6 @@ void manageJobs(char** cmd, char* input, JobNode_t** head){
     lastIndex++;
   }
   lastIndex--;
-
-  printf("CMD: %s\n", cmd[0]);
-  printf("PROC: %d\n", getpid());
-  printf("CMDPTR: %p\n", cmd);
 
   if (strcmp(cmd[0], JOBS_TOK) == 0){
     // execute jobs list
@@ -661,7 +659,15 @@ static void sigtstpHandler(int sigNum){
  *   None
  */
 static void sigchldHandler(int sigNum){
-  printf("SIGCHLD EXECUTED\n");
+  const char* PROMPT = "# ";
+  
+  printf("\nSIGCHLD EXECUTED\n");
+  int pgid;
+  int status;
+  while ((pgid = waitpid(-1, &status, WNOHANG)) != -1){
+    printf("PGID: %d\n",pgid);
+    printf("%s", PROMPT);
+  }
   signal(SIGCHLD, sigchldHandler);
 }
 
