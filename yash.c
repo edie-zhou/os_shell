@@ -622,8 +622,7 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
     if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
     	printf("signal(SIGTSTP) error");
     }
- 
-    setpgid(0,0);
+    
     // if (back) {
     //   // tcsetpgrp(0, getpid());
     // }
