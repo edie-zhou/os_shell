@@ -71,12 +71,13 @@ int countNodes(JobNode_t** head){
  *   None
  */ 
 void pushNode(JobNode_t** head, char* jobStr, int pgid, int status){
+  printf("PUSHED \n");
   JobNode_t* temp = (JobNode_t*)malloc(sizeof(JobNode_t));
 
   temp->jobStr = (char*)malloc(2000*sizeof(char));
   strcpy(temp->jobStr, jobStr);
   temp->pgid = pgid;
-  if(*head == NULL){
+  if (*head == NULL){
     temp->jobId = 1;
   }
   else{
@@ -84,8 +85,10 @@ void pushNode(JobNode_t** head, char* jobStr, int pgid, int status){
   }  
   temp->status = status;
   temp->next = *head;
-
+  printf("HEAD: %p\n", *head);
+  printf("TEMP: %p\n", temp);
   *head = temp;
+  printf("NEW HEAD: %p\n", *head);
 
   return;
 }
@@ -105,7 +108,7 @@ int popNode(JobNode_t** head){
   JobNode_t* temp;
   int popped;
 
-  if(*head == NULL){
+  if (*head == NULL){
     return INVALID;
   }
 
@@ -129,6 +132,7 @@ int popNode(JobNode_t** head){
  *   None
  */
 void printStack(JobNode_t** head){
+  printf("PRINT STACK \n");
   const int RUN_VAL = 0;
   const int STOPPED_VAL = 1;
   const char CURRENT = '+';
@@ -138,22 +142,25 @@ void printStack(JobNode_t** head){
   const char* STOP_TXT = "STOPPED";
   const char* status;
   char currentJob;
+  int currentID;
   
   JobNode_t* temp = *head;
-  int currentID = temp->jobId;
+  if(temp != NULL){
+    currentID = temp->jobId;
+  }
 
   while(temp != NULL){
-    if(temp->jobId == currentID){
+    if (temp->jobId == currentID){
       currentJob = CURRENT;
     }
     else{
       currentJob = BACK;
     }
 
-    if(temp->status == RUN_VAL){
+    if (temp->status == RUN_VAL){
       status = RUN_TXT;
     }
-    else if(temp->status == STOPPED_VAL){
+    else if (temp->status == STOPPED_VAL){
       status = STOP_TXT;
     }
 
@@ -183,10 +190,10 @@ int checkTokens(char* input, int maxLineLen, int maxTokenLen){
   int tokenLen = 0;
   int k = 0;
   while(k < strlen(input)){
-    if(tokenLen >= maxTokenLen){
+    if (tokenLen >= maxTokenLen){
       return INVALID;
     }
-    else if((tokenLen < maxTokenLen) && (input[k] == SPACE_CHAR)){
+    else if ((tokenLen < maxTokenLen) && (input[k] == SPACE_CHAR)){
       tokenLen = 0;
     }
     else{
@@ -216,10 +223,10 @@ int checkInput(char* input, int maxLineLen, int maxTokenLen){
   // TODO: Add input verification to ensure that bg, fg, & are at expected indices
   const int INVALID = 0;
   const int VALID = 1;
-  if(strlen(input) > maxLineLen + 1){
+  if (strlen(input) > maxLineLen + 1){
     return INVALID;
   }
-  else if(!checkTokens(input, maxLineLen, maxTokenLen)){
+  else if (!checkTokens(input, maxLineLen, maxTokenLen)){
     return INVALID;
   }
   return VALID;
@@ -238,7 +245,8 @@ int checkInput(char* input, int maxLineLen, int maxTokenLen){
  * 
  */
 char** splitStrArray(char* input, const char* delim){
-  const int MAX_LINE_LEN = 2000;
+  const int MAX_LINE_LEN = 2001;
+  const int MAX_TOK_LEN = 31;
   char* copy = (char*)malloc(MAX_LINE_LEN * sizeof(char));
   strcpy(copy, input);
   
@@ -246,11 +254,19 @@ char** splitStrArray(char* input, const char* delim){
   int numElements = 0;
 
   char* token = strtok(copy, delim);
+  char* entry = (char*)malloc(MAX_TOK_LEN * sizeof(char));
+  strcpy(entry, token);
+
   while(token != NULL){
     numElements++;
     splitted = realloc(splitted, numElements * sizeof(char*));
-    splitted[numElements - 1] = token;
+    splitted[numElements - 1] = entry;
+
     token = strtok(NULL, delim);
+    if(token != NULL){
+      entry = (char*)malloc(MAX_TOK_LEN * sizeof(char));
+      strcpy(entry, token);
+    }
   }
 
   // Assign NULL to last index
@@ -259,6 +275,7 @@ char** splitStrArray(char* input, const char* delim){
   splitted[numElements - 1] = 0;
 
   free(copy);
+  printf("MALLOCD: %p\n", splitted);
   return splitted;
 }
 
@@ -283,16 +300,16 @@ void changeRedirToks(char** cmd, int* inIndex, int* outIndex, int* errIndex){
 
   int index = 0;
   while(cmd[index] != NULL){
-    if(!strcmp(cmd[index], IN_REDIR)){
+    if (!strcmp(cmd[index], IN_REDIR)){
       *inIndex = index + 1;
       // Assign NULL to stop exec() from reading file redirection as part of cmd
       cmd[index] = NULL;
     }
-    else if(!strcmp(cmd[index], OUT_REDIR)){
+    else if (!strcmp(cmd[index], OUT_REDIR)){
       *outIndex = index + 1;
       cmd[index] = NULL;
     }
-    else if(!strcmp(cmd[index], ERR_REDIR)){
+    else if (!strcmp(cmd[index], ERR_REDIR)){
       *errIndex = index + 1;
       cmd[index] = NULL;
     }
@@ -323,16 +340,16 @@ void redirectFile(char** cmd){
 
   changeRedirToks(cmd, &inIndex, &outIndex, &errIndex);
 
-  if(inIndex != INVALID){
-    if((fdIn = open(cmd[inIndex], O_RDONLY, 0)) == INVALID){
+  if (inIndex != INVALID){
+    if ((fdIn = open(cmd[inIndex], O_RDONLY, 0)) == INVALID){
         perror(cmd[inIndex]);
         exit(EXIT_FAILURE);
     }
     dup2(fdIn, STDIN_FILENO);
     close(fdIn);
   }
-  if(outIndex != INVALID){
-    if((fdOut = open(cmd[outIndex], O_CREAT | O_WRONLY | O_TRUNC,
+  if (outIndex != INVALID){
+    if ((fdOut = open(cmd[outIndex], O_CREAT | O_WRONLY | O_TRUNC,
         S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
       perror(cmd[outIndex]);
       exit(EXIT_FAILURE);
@@ -340,8 +357,8 @@ void redirectFile(char** cmd){
     dup2(fdOut, STDOUT_FILENO);
     close(fdOut);
   }
-  if(errIndex != INVALID){
-    if((fdErr = open(cmd[errIndex], O_CREAT | O_WRONLY | O_TRUNC,
+  if (errIndex != INVALID){
+    if ((fdErr = open(cmd[errIndex], O_CREAT | O_WRONLY | O_TRUNC,
         S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
       perror(cmd[errIndex]);
       exit(EXIT_FAILURE);
@@ -374,12 +391,12 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
   int waitID;
 
   pidCh1 = fork();
-  if (pidCh1 < 0) {
+  if (pidCh1 < 0){
     // fork failed; exit
     fprintf(stderr, "Fork failed\n");
     exit(EXIT_FAILURE);
   }
-  else if (pidCh1 == 0) {
+  else if (pidCh1 == 0){
     // child (new process)
     if (signal(SIGINT, sigintHandler) == SIG_ERR){
 	    printf("signal(SIGINT) error");
@@ -388,7 +405,7 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
     	printf("signal(SIGTSTP) error");
     }
  
-    if(back) {
+    if (back) {
       setpgid(0,0);
       // tcsetpgrp(0, getpid());
     }
@@ -401,17 +418,19 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
     exit(EXIT_FAILURE);
   }
   // parent goes down this path (main)
-  if(!back) {
+  if (!back){
     // If not background proc, wait to execution completion
-    waitpid (pidCh1, &status, WCONTINUED | WUNTRACED);
+    waitpid(pidCh1, &status, WCONTINUED | WUNTRACED);
     pidCh1 = -1;
   }
-  else {
+  else{
     // Return to prompt for background process
     fprintf(stderr, "Starting background process\n");
 
     // Add background job to stack
     pushNode(head, input, pidCh1, RUNNING);
+
+    printf("NEW NEW HEAD: %p\n", *head);
 
     setpgid(pidCh1, pidCh1);
     // tcsetpgrp(0, pidCh1);
@@ -466,7 +485,7 @@ void executePipe(char** cmd1, char** cmd2){
   }
 
   pidCh2 = fork();
-  if (pidCh2 < 0) {
+  if (pidCh2 < 0){
     // fork failed; exit
     fprintf(stderr, "Fork failed\n");
     exit(EXIT_FAILURE);
@@ -524,25 +543,30 @@ void manageJobs(char** cmd, char* input, JobNode_t** head){
   }
   lastIndex--;
 
-  if(!strcmp(cmd[0], JOBS_TOK)){
+  printf("CMD: %s\n", cmd[0]);
+  printf("PROC: %d\n", getpid());
+  printf("CMDPTR: %p\n", cmd);
+
+  if (strcmp(cmd[0], JOBS_TOK) == 0){
     // execute jobs list
-    printf("RUNNING JOBS\n");
-    if(head != NULL){
+    printf("MANAGEJOBS: %p\n", *head);
+    if ((*head) != NULL){
+      printf("RUNNING JOBS\n");
       printStack(head);
     }
     return;
   } 
-  else if(!strcmp(cmd[0], BG_TOK)){
+  else if (!strcmp(cmd[0], BG_TOK)){
     // execute bg
     printf("RUNNING BG\n");
     return;
   }
-  else if(!strcmp(cmd[0], FG_TOK)){
+  else if (!strcmp(cmd[0], FG_TOK)){
     // execute fg
     printf("RUNNING FG\n");
     return;
   }
-  else if(!strcmp(cmd[lastIndex], BACKGROUND)){
+  else if (!strcmp(cmd[lastIndex], BACKGROUND)){
     // execute background
     printf("RUNNING &\n");
     cmd[lastIndex] = NULL;
@@ -574,13 +598,13 @@ static void sigintHandler(int sigNum){
   printf("PID: %d\n", getpid());
   printf("child1 pid: %d\n", pidCh1);
   printf("child2 pid: %d\n", pidCh2);
-	if(pidCh2 != -1){
+	if (pidCh2 != -1){
 		kill(pidCh2, SIGINT);
     // pidCh2 = -1;
     kill(pidCh1, SIGINT);
     // pidCh1 = -1;
 	}
-  else if(pidCh1 != -1){
+  else if (pidCh1 != -1){
     kill(pidCh1, SIGINT);
     // pidCh1 = -1;
 	}
@@ -610,13 +634,13 @@ static void sigtstpHandler(int sigNum){
   printf("PID: %d\n", getpid());
   printf("child1 pid: %d\n", pidCh1);
   printf("child2 pid: %d\n", pidCh2);
-	if(pidCh2 != -1){
+	if (pidCh2 != -1){
 		kill(pidCh2, SIGTSTP);
     // pidCh2 = -1;
     kill(pidCh1, SIGTSTP);
     // pidCh1 = -1;
 	}
-  else if(pidCh1 != -1){
+  else if (pidCh1 != -1){
     kill(pidCh1, SIGTSTP);
     // pidCh1 = -1;
 	}
@@ -660,9 +684,7 @@ void shellLoop(void){
   const int MAX_LINE_LEN = 2001;
   const int MAX_TOKEN_LEN = 31;
   int validInput = 0;
-
-  // index for memory frees
-  // int index = 0;
+  int index;
   
   // Initialize job control stack
   JobNode_t* nullEntry = NULL;
@@ -680,7 +702,6 @@ void shellLoop(void){
   signal(SIGTSTP, SIG_IGN);
   signal(SIGTTIN, SIG_IGN);
   signal(SIGTTOU, SIG_IGN);
-  signal(SIGCHLD, SIG_IGN);
 
   while(input = readline(PROMPT)){
     if (signal(SIGINT, sigintHandler) == SIG_ERR){
@@ -695,23 +716,21 @@ void shellLoop(void){
     printf("***\n1: %d\n", pidCh1);
     printf("2: %d\n***\n", pidCh2);
     validInput = checkInput(input, MAX_LINE_LEN, MAX_TOKEN_LEN);
-    if(validInput){
+    if (validInput){
       // TODO: fix free statements
       char** pipeArray = splitStrArray(input, PIPE);
-      if(pipeArray[1] == NULL){
+      if (pipeArray[1] == NULL){
         // no pipe
         char** cmd = splitStrArray(input, SPACE_CHAR);
 
         manageJobs(cmd, input, jobStack);
 
-        // free allocated memory
-        // index = 0;
-        // while(cmd[index] != NULL){
-        //   free(cmd[index]);
-        //   index++;
-        // }
-        // free(cmd[index]);
-        // free(cmd);
+        index = 0;
+        while(cmd[index] != NULL){
+          free(cmd[index]);
+          index++;
+        }
+        free(cmd);
       }
       else{
         // pipe exists
@@ -720,29 +739,20 @@ void shellLoop(void){
 
         executePipe(cmd1, cmd2);
 
-        // free allocated memory
-        // index = 0;
-        // int cmd1Freed = 0;
-        // int cmd2Freed = 0;
-        // while((cmd1[index] != NULL) || (cmd2[index] != NULL)){
-        //   if((cmd1[index] != NULL) && !cmd1Freed){
-        //     free(cmd1[index]);
-        //   }
-        //   if((cmd2[index] != NULL) && !cmd2Freed){
-        //     free(cmd2[index]);
-        //   }
-        //   index++;
-        // }
-        // free(cmd1);
-        // free(cmd2);
+        free(cmd1);
+        free(cmd2);
       }
-      // free(pipeArray);
+      free(pipeArray);
     }
     else{
       printf("%c", NEW_LINE);
     }
     free(input);
   }
+
+  // TODO: free jobStack nodes
+  free(jobStack);
+
 
   return;
 }
