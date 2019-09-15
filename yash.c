@@ -16,14 +16,6 @@
 // TODO: Refactor into several .c and .h files, separating read, parse, and
 //       execute would be a good place to start
 
-int pidCh1 = -1;
-int pidCh2 = -1;
-int stopped = -1;
-
-static void sigintHandler(int sigNum);
-static void sigtstpHandler(int sigNum);
-static void sigchldHandler(int sigNum);
-
 /**
  * JobNode_t struct
  */ 
@@ -35,6 +27,16 @@ typedef struct JobNode_t{
 
   struct JobNode_t* next;
 }JobNode_t;
+
+JobNode_t** jobStack = NULL;
+
+int pidCh1 = -1;
+int pidCh2 = -1;
+int stopped = -1;
+
+static void sigintHandler(int sigNum);
+static void sigtstpHandler(int sigNum);
+static void sigchldHandler(int sigNum);
 
 /**
  * Purpose:
@@ -165,7 +167,7 @@ void printStack(JobNode_t** head){
       status = STOP_TXT;
     }
     else if (curr->status == DONE_VAL){
-      status = STOP_TXT;
+      status = DONE_TXT;
     }
 
     printf("[%d] %c %s         %s \n", curr->jobId, currentJob, status,
@@ -625,6 +627,7 @@ void manageJobs(char** cmd, char* input, JobNode_t** head){
     if ((*head) != NULL){
       printf("RUNNING JOBS\n");
       printStack(head);
+      removeDoneJobs(jobStack);
     }
     return;
   } 
@@ -735,16 +738,17 @@ static void sigtstpHandler(int sigNum){
  */
 static void sigchldHandler(int sigNum){
   const char* PROMPT = "# ";
+  const int DONE = 2;
   
-  printf("\nSIGCHLD EXECUTED\n");
+  // printf("\nSIGCHLD EXECUTED\n");
   int pgid;
   int status;
+  int test = 0;
   while ((pgid = waitpid(-1, &status, WNOHANG)) != -1){
-    printf("PGID: %d\n",pgid);
-    printf("%s", PROMPT);
-    // changeJobStatus();
+    // printf("PGID: %d\n",pgid);
+    changeJobStatus(jobStack, pgid, DONE);
   }
-  // removeDoneJobs();
+  // printf("%s", PROMPT);
   signal(SIGCHLD, sigchldHandler);
 }
 
@@ -767,9 +771,8 @@ void shellLoop(void){
   int index;
   
   // Initialize job control stack
-  JobNode_t* nullEntry = NULL;
-  JobNode_t** jobStack = (JobNode_t**)malloc(sizeof(JobNode_t*));
-  *jobStack = nullEntry;
+  jobStack = (JobNode_t**)malloc(sizeof(JobNode_t*));
+  *jobStack = NULL;
 
   char* input;
 
