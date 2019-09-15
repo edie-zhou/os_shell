@@ -268,14 +268,12 @@ void executeGeneral(char** input, int back){
     // Add background job to stack
 
     setpgid(pidCh1, pidCh1);
-    // tcsetpgrp(0, pidCh1);
-    // tcsetpgrp(1, pidCh1);
+    tcsetpgrp(0, pidCh1);
+    tcsetpgrp(1, pidCh1);
     waitID = waitpid(-1, &status, WNOHANG);
-    // tcsetpgrp(0, getpid());
-    // tcsetpgrp(1, getpid());
+    tcsetpgrp(0, getpid());
+    tcsetpgrp(1, getpid());
   }
-  
-  
 }
 
 /**
@@ -407,7 +405,12 @@ void pushNode(JobNode_t** head, char* jobStr, int pgid, int status){
   temp->jobStr = (char*)malloc(2000*sizeof(char));
   strcpy(temp->jobStr, jobStr);
   temp->pgid = pgid;
-  temp->jobId = countNodes(head) + 1;
+  if(*head == NULL){
+    temp->jobId = 1;
+  }
+  else{
+    temp->jobId = (*head)->jobId + 1;
+  }  
   temp->status = status;
   temp->next = *head;
 
@@ -628,7 +631,8 @@ static void sigtstpHandler(int sigNum){
  *   None
  */
 static void sigchldHandler(int sigNum){
-  
+  printf("SIGCHLD EXECUTED\n");
+  signal(SIGCHLD, sigtstpHandler);
 }
 
 /**
