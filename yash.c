@@ -124,6 +124,44 @@ int popNode(JobNode_t** head){
 
 /**
  * Purpose:
+ *   Change state of completed jobs in job stack
+ * 
+ * Args:
+ *   head (JobNode_t**): Pointer to job stack head pointer
+ * 
+ * Returns:
+ *   None
+ */
+void checkDoneJobs(JobNode_t** head){
+  const int DONE_VAL = 2;
+  int jobPGID;
+  JobNode_t* curr = *head;
+
+  while(curr != NULL){
+    jobPGID = waitpid(curr->pgid, NULL, WNOHANG);
+    if(jobPGID == curr->pgid){
+      curr->status = DONE_VAL;
+    }
+    curr = curr->next;
+  }
+  return;
+}
+
+/**
+ * Purpose:
+ *   Print completed jobs
+ * 
+ * Args:
+ * 
+ * Returns:
+ *   None
+ */
+void printDoneJobs(){
+
+}
+
+/**
+ * Purpose:
  *   Print stack of background jobs
  * 
  * Args:
@@ -216,7 +254,7 @@ void removeDoneJobs(JobNode_t** head){
   const int DONE = 2;
   JobNode_t* curr = *head;
   JobNode_t* temp = curr->next;
-  int changed = 0;
+
   while((curr != NULL) && (curr->status == DONE)){
     free(curr);
     curr = temp;
@@ -623,9 +661,9 @@ void manageJobs(char** cmd, char* input, JobNode_t** head){
 
   if (strcmp(cmd[0], JOBS_TOK) == 0){
     // execute jobs list
-    printf("MANAGEJOBS: %p\n", *head);
     if ((*head) != NULL){
       printf("RUNNING JOBS\n");
+      checkDoneJobs(head);
       printStack(head);
       removeDoneJobs(jobStack);
     }
@@ -737,18 +775,8 @@ static void sigtstpHandler(int sigNum){
  *   None
  */
 static void sigchldHandler(int sigNum){
-  const char* PROMPT = "# ";
-  const int DONE = 2;
-  
-  // printf("\nSIGCHLD EXECUTED\n");
-  int pgid;
-  int status;
-  int test = 0;
-  while ((pgid = waitpid(-1, &status, WNOHANG)) != -1){
-    // printf("PGID: %d\n",pgid);
-    changeJobStatus(jobStack, pgid, DONE);
-  }
-  // printf("%s", PROMPT);
+  printf("\nSIGCHLD EXECUTED\n");
+
   signal(SIGCHLD, sigchldHandler);
 }
 
