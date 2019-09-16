@@ -22,7 +22,7 @@
 typedef struct JobNode_t{
 	char* jobStr;
   int jobId;
-  int pgid;
+  int pid;
   int status; // or enum
 
   struct JobNode_t* next;
@@ -145,12 +145,12 @@ int countNodes(JobNode_t** head){
  * Returns:
  *   None
  */ 
-void pushNode(JobNode_t** head, char* jobStr, int pgid, int status){
+void pushNode(JobNode_t** head, char* jobStr, int pid, int status){
   JobNode_t* curr = (JobNode_t*)malloc(sizeof(JobNode_t));
 
   curr->jobStr = (char*)malloc(2001 * sizeof(char));
   strcpy(curr->jobStr, jobStr);
-  curr->pgid = pgid;
+  curr->pid = pid;
   if (*head == NULL){
     curr->jobId = 1;
   }
@@ -183,7 +183,7 @@ int popNode(JobNode_t** head){
   }
 
   curr = (*head)->next;
-  popped = (*head)->pgid;
+  popped = (*head)->pid;
   free((*head)->jobStr);
   free(*head);
   *head = curr;
@@ -203,12 +203,12 @@ int popNode(JobNode_t** head){
  */
 void checkDoneJobs(JobNode_t** head){
   const int DONE_VAL = 2;
-  int jobPGID;
+  int jobPID;
   JobNode_t* curr = *head;
 
   while(curr != NULL){
-    jobPGID = waitpid(curr->pgid, NULL, WNOHANG);
-    if(jobPGID == curr->pgid){
+    jobPID = waitpid(curr->pid, NULL, WNOHANG);
+    if(jobPID == curr->pid){
       curr->status = DONE_VAL;
     }
     curr = curr->next;
@@ -318,18 +318,18 @@ void printStack(JobNode_t** head){
  * 
  * Args:
  *   head (JobNode_t**): Pointer to job stack head pointer
- *   pgid         (int): Process group ID
+ *   pid          (int): Process group ID
  *   newStatus    (int): New running status of process
  * 
  * Returns:
  *   None
  */ 
-void changeJobStatus(JobNode_t** head, int pgid, int newStatus){
+void changeJobStatus(JobNode_t** head, int pid, int newStatus){
   JobNode_t* temp = *head;
   int changed = 0;
 
   while((!changed)&&(temp != NULL)){
-    if(temp->pgid == pgid){
+    if(temp->pid == pid){
       changed = 1;
       temp->status = newStatus;
     }
@@ -622,11 +622,11 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
     if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
     	printf("signal(SIGTSTP) error");
     }
-    
+
     // if (back) {
     //   // tcsetpgrp(0, getpid());
     // }
-
+    setpgid(0,0);
     redirectFile(cmd);
     execvp(cmd[0], cmd);
 
@@ -634,9 +634,8 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
     printf("%c", NEW_LINE);
     exit(EXIT_FAILURE);
   }
-  // parent goes down this path (main)
-  setpgid(pidCh1, pidCh1);
-
+  
+  // parent process
   if (!back){
     // If not background proc, wait to execution completion
     waitID = waitpid(pidCh1, &status, WCONTINUED | WUNTRACED);
@@ -648,7 +647,6 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
 
     // Add background job to stack
     pushNode(head, input, pidCh1, RUNNING);
-
 
     // tcsetpgrp(0, pidCh1);
     // waitID = waitpid(-1, &status, WNOHANG);
@@ -678,6 +676,9 @@ void executePipe(char** cmd1, char** cmd2){
   int pfd[2];
   pipe(pfd);
 
+  int fuck = getpgrp();
+  printf("Parent PGID: %d\n", fuck);
+
   pidCh1 = fork();
   if (pidCh1 < 0) {
     // fork failed; exit
@@ -692,6 +693,11 @@ void executePipe(char** cmd1, char** cmd2){
     if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
     	printf("signal(SIGTSTP) error");
     } 
+
+    setpgid(0,0);
+    int pgid = getpgid(0);
+    printf("Child 1 PGID: %d\n", pgid);
+
     dup2(pfd[1], 1);
     close(pfd[0]);
     redirectFile(cmd1);
@@ -710,12 +716,15 @@ void executePipe(char** cmd1, char** cmd2){
   }
   else if (pidCh2 == 0){
     // child 2 (new process)
+    // TODO: Find out if these handlers are needed
     if (signal(SIGINT, sigintHandler) == SIG_ERR){
 	    printf("signal(SIGINT) error");
     }
     if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
     	printf("signal(SIGTSTP) error");
     } 
+    
+    setpgid(0, pidCh1);
     dup2(pfd[0], 0);
     close(pfd[1]);
     redirectFile(cmd2);
@@ -726,6 +735,8 @@ void executePipe(char** cmd1, char** cmd2){
     exit(EXIT_FAILURE);
   }
   // parent goes down this path (main)
+  printf("%d, %d\n", pidCh1, pidCh2);
+  setpgid(pidCh1, pidCh2);
   close(pfd[0]);
   close(pfd[1]);
   waitpid(-1, &status1, WCONTINUED | WUNTRACED);
@@ -830,6 +841,9 @@ void shellLoop(void){
   // Reset pid's
   pidCh1 = -1;
   pidCh2 = -1;
+
+  int pgid = getpgrp();
+  printf("Shell PGID: %d\n", pgid);
 
   // Block signals outside of shell
   signal(SIGINT, SIG_IGN);
