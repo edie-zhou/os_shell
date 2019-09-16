@@ -85,23 +85,34 @@ int findID(JobNode_t** head, int id){
  *   Find most recent job that is stopped or in background
  * 
  * Args:
- *   head (JobNode_t**): Pointer to job stack head pointer
- *   id           (int): Process group ID to look for
+ *   head       (JobNode_t**): Pointer to job stack head pointer
+ *   findStopped        (int): if 1, only look for stopped jobs
  * 
  * Returns:
  *   (int): PGID of most recent stopped job
  */ 
-int findRecent(JobNode_t** head){
+int findRecent(JobNode_t** head, int stoppedOnly){
   const int STOPPED_VAL = 1;
+  const int DONE_VAL = 2;
   const int NOT_FOUND = -1;
 
   JobNode_t* curr = *head;
   
-  while(curr != NULL){
-    if(curr->status == STOPPED_VAL){
-      return curr->pgid;
+  if(stoppedOnly){
+    while(curr != NULL){
+      if(curr->status == STOPPED_VAL){
+        return curr->pgid;
+      }
+      curr = curr->next;
     }
-    curr = curr->next;
+  }
+  else{
+    while(curr != NULL){
+      if(curr->status != DONE_VAL){
+        return curr->pgid;
+      }
+      curr = curr->next;
+    }
   }
 
   return NOT_FOUND;
@@ -891,7 +902,8 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
  */ 
 void runForeground(JobNode_t** head){
   const int NOT_FOUND = -1;
-  int recent = findRecent(head);
+  int notStoppedOnly = 0;
+  int recent = findRecent(head, notStoppedOnly);
   if(recent != NOT_FOUND){
     removeJob(head, recent);
     kill(recent, SIGCONT);
@@ -900,41 +912,6 @@ void runForeground(JobNode_t** head){
   else{
     printf("no valid jobs for fg\n");
   }
-	// // printf("IN fg");
-	// // printf("IN kjob");
-	// int count = 0, i;
-	// for ( i = 0; args[i] != NULL; ++i)
-	// 	count = count + 1;
-	// // printf("%d\n", count );
-
-	// if(count >=3)
-	// 		fprintf(stderr,RED "fg: Too many arguments\nUsage: fg <jobNumber>\n" RESET);
-	// else if(count <= 1)
-	// 		fprintf(stderr,RED "fg: Too few arguments\nUsage: fg <jobNumber>\n" RESET);
-	// else
-	// {
-
-	// 	int inC = atoi(args[1]);
-	// 	qjob* job_node = getjob(head, inC);
-	// 	if(job_node !=NULL)
-	// 	{
-	// 		int pid = job_node -> pid;
-	// 		int flag = 1;
-	// 		kill(pid, SIGCONT);
-	// 		// kill(pid, SIGTTIN);
-	// 		// kill(pid, SIGTTOU);
-	// 		childPID = pid;	
-	// 		strcpy(nowProcess, job_node->name);
-	// 		removeLL(head, pid);
-	// 		// wait(NULL);
-	// 		waitpid(-1,NULL,WUNTRACED);
-	// 	}
-	// 	else
-	// 	{
-	// 		fprintf(stderr,RED "fg: No such pid exists\n" RESET);
-	// 	}
-	// }
-
 	return;
 }
 
@@ -948,39 +925,21 @@ void runForeground(JobNode_t** head){
  * Returns:
  *   None
  */ 
-void run_bg(JobNode_t** head){
-	// printf("IN bg");
-	// printf("IN kjob");
-	// int count = 0, i;
-	// for ( i = 0; args[i] != NULL; ++i)
-	// 	count = count + 1;
-	// // printf("%d\n", count );
-
-	// if(count >=3)
-	// 		fprintf(stderr,RED "bg: Too many arguments\nUsage: bg <jobNumber>\n" RESET);
-	// else if(count <= 1)
-	// 		fprintf(stderr,RED "bg: Too few arguments\nUsage: bg <jobNumber>\n" RESET);
-	// else
-	// {
-
-	// 	int inC = atoi(args[1]);
-	// 	qjob* job_node = getjob(head, inC);
-	// 	if(job_node !=NULL)
-	// 	{
-	// 		int pid = job_node -> pid;
-	// 		int flag = 1;
-	// 		kill(pid, SIGTTIN);
-	// 		kill(pid, SIGCONT);
-	// 		changestatLL(head,pid,1);
-	// 		// signal(SIGINT,SIG_IGN);
-	// 	}
-	// 	else
-	// 	{
-	// 		fprintf(stderr,RED "bg: No such pid exists\n" RESET);
-	// 	}
-
-	// }
-
+void runBackground(JobNode_t** head){
+  const int INVALID = -1;
+  const int RUNNING = 0;
+  int stoppedOnly = 1;
+  int recent = findRecent(head, stoppedOnly);
+  printf("BG RECENT: %d", recent);
+  if(recent != INVALID){
+    // kill(recent, SIGTTIN);
+    kill(recent, SIGCONT);
+    changeJobStatus(head, recent, RUNNING);
+    // signal(SIGINT,SIG_IGN);
+  }
+  else{
+    printf("no valid jobs for bg\n");
+  }
 	return;
 }
 
@@ -1023,6 +982,7 @@ void manageJobs(char** cmd, char* input, JobNode_t** head){
   else if(!strcmp(cmd[0], BG_TOK)){
     // execute bg
     printf("RUNNING BG\n");
+    runBackground(head);
     return;
   }
   else if(!strcmp(cmd[0], FG_TOK)){
@@ -1093,6 +1053,7 @@ void managePipeJobs(char** cmd1, char** cmd2, char* input, JobNode_t** head){
   else if(!strcmp(cmd1[0], BG_TOK) || !strcmp(cmd2[0], BG_TOK)){
     // execute bg
     printf("RUNNING BG\n");
+    runBackground(head);
     return;
   }
   else if(!strcmp(cmd1[0], FG_TOK) || !strcmp(cmd2[0], FG_TOK)){
