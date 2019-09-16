@@ -445,6 +445,9 @@ int checkInput(char* input){
   if (strlen(input) > MAX_LINE_LEN){
     return INVALID;
   }
+  else if(strlen(input) == 0){
+    return INVALID;
+  }
   else if (!checkTokens(input, MAX_LINE_LEN, MAX_TOKEN_LEN)){
     return INVALID;
   }
