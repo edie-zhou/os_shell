@@ -507,8 +507,10 @@ int checkTokens(char* input, int maxLineLen, int maxTokenLen){
   const int VALID = 1;
   const int INVALID = 0;
   const char SPACE_CHAR = ' ';
+
   int tokenLen = 0;
   int k = 0;
+
   while(k < strlen(input)){
     if(tokenLen >= maxTokenLen){
       return INVALID;
@@ -521,6 +523,7 @@ int checkTokens(char* input, int maxLineLen, int maxTokenLen){
     }
     k++;
   }
+
   return VALID;
 }
 
@@ -543,6 +546,7 @@ int checkInput(char* input){
   const int MAX_TOKEN_LEN = 31;
   const int INVALID = 0;
   const int VALID = 1;
+
   if(strlen(input) > MAX_LINE_LEN){
     return INVALID;
   }
@@ -570,6 +574,7 @@ int checkInput(char* input){
 char** splitStrArray(char* input, const char* delim){
   const int MAX_LINE_LEN = 2001;
   const int MAX_TOK_LEN = 31;
+
   char* copy = (char*)malloc(MAX_LINE_LEN * sizeof(char));
   strcpy(copy, input);
   
@@ -621,6 +626,7 @@ void changeRedirToks(char** cmd, int* inIndex, int* outIndex, int* errIndex){
   const char* ERR_REDIR = "2>";
 
   int index = 0;
+
   while(cmd[index] != NULL){
     if(!strcmp(cmd[index], IN_REDIR)){
       *inIndex = index + 1;
@@ -653,6 +659,7 @@ void changeRedirToks(char** cmd, int* inIndex, int* outIndex, int* errIndex){
  */
 void redirectFile(char** cmd){
   const int INVALID = -1;
+
   int inIndex = -1;
   int outIndex = -1;
   int errIndex = -1;
@@ -856,14 +863,17 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
  */ 
 void runForeground(JobNode_t** head){
   const int NOT_FOUND = -1;
+
   int notStoppedOnly = 0;
   int recent = findRecent(head, notStoppedOnly);
+
   if(recent != NOT_FOUND){
     removeJob(head, recent);
     kill(recent, SIGCONT);
     
     waitpid(recent,NULL,WUNTRACED);
   }
+
 	return;
 }
 
@@ -882,14 +892,17 @@ void runBackground(JobNode_t** head){
   const int RUNNING = 0;
   const char CURRENT = '+';
   const char* RUN_STR = "Running";
+
   int stoppedOnly = 1;
   int recent = findRecent(head, stoppedOnly);
+
   if(recent != INVALID){
     kill(recent, SIGCONT);
     changeJobStatus(head, recent, RUNNING);
     printf("[%d]%c  %s         %s \n", (*jobStack)->jobId, CURRENT, RUN_STR,
            (*jobStack)->jobStr);
   }
+
 	return;
 }
 
@@ -912,9 +925,10 @@ void manageJobs(char** cmd, char* input, JobNode_t** head){
   const char* BG_TOK = "bg";
   const char* FG_TOK = "fg";
   const char* JOBS_TOK = "jobs";
-  int backState = 0;
 
+  int backState = 0;
   int lastIndex = 0;
+
   while(cmd[lastIndex] != NULL){
     lastIndex++;
   }
@@ -923,40 +937,37 @@ void manageJobs(char** cmd, char* input, JobNode_t** head){
   if(strcmp(cmd[0], JOBS_TOK) == 0){
     // print job stack
     if((*head) != NULL){
-      checkDoneJobs(head);
       printStack(head);
-      removeDoneJobs(head);
     }
+
     return;
   } 
   else if(!strcmp(cmd[0], BG_TOK)){
     // execute bg
     runBackground(head);
+
     return;
   }
   else if(!strcmp(cmd[0], FG_TOK)){
     // execute fg
     runForeground(head);
+
     return;
   }
   else if(!strcmp(cmd[lastIndex], BACKGROUND)){
     // execute in background
-    cmd[lastIndex] = NULL;
     backState = 1;
+    cmd[lastIndex] = NULL;
 
-    // print done jobs
-    if((*head) != NULL){
-      checkDoneJobs(head);
-      printDoneJobs(head);
-      removeDoneJobs(head);
-    }
     executeGeneral(cmd, input, head, backState);
+
     return;
   }
   else{
     // execute normally
     backState = 0;
     executeGeneral(cmd, input, head, backState);
+
     return;
   }
 }
@@ -992,40 +1003,37 @@ void managePipeJobs(char** cmd1, char** cmd2, char* input, JobNode_t** head){
   if(strcmp(cmd1[0], JOBS_TOK) == 0){
     // print job stack
     if((*head) != NULL){
-      checkDoneJobs(head);
       printStack(head);
-      removeDoneJobs(head);
     }
+
     return;
   } 
   else if(!strcmp(cmd1[0], BG_TOK) || !strcmp(cmd2[0], BG_TOK)){
     // execute bg
     runBackground(head);
+
     return;
   }
   else if(!strcmp(cmd1[0], FG_TOK) || !strcmp(cmd2[0], FG_TOK)){
     // execute fg
     runForeground(head);
+
     return;
   }
   else if(!strcmp(cmd2[lastIndex], BACKGROUND)){
     // execute in background
-    cmd2[lastIndex] = NULL;
     backState = 1;
+    cmd2[lastIndex] = NULL;
 
-    // print done jobs
-    if((*head) != NULL){
-      checkDoneJobs(head);
-      printDoneJobs(head);
-      removeDoneJobs(head);
-    }
     executePipe(cmd1, cmd2, input, head, backState);
+
     return;
   }
   else{
     // execute normally
     backState = 0;
     executePipe(cmd1, cmd2, input, head, backState);
+    
     return;
   }
 }
@@ -1075,6 +1083,12 @@ void shell(void){
     if(signal(SIGCHLD, sigchldHandler) == SIG_ERR){
       printf("signal(SIGCHLD) error");
     } 
+
+    if((*jobStack) != NULL){
+      checkDoneJobs(jobStack);
+      printDoneJobs(jobStack);
+      removeDoneJobs(jobStack);
+    }
 
     validInput = checkInput(input);
     if(validInput){
