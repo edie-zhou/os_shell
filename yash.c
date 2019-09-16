@@ -13,6 +13,9 @@
 // Directions here:
 // https://docs.google.com/document/d/1LBMJslvYvw59uZ_8DNiiPzsp0heW3qesaalOo31IGYg/edit
 
+// TODO: # cat < temp.txt > output.txt 2> error.txt produces seg fault
+// ERROR: free(): invalid next size (fast)
+
 // TODO: Refactor into several .c and .h files, separating read, parse, and
 //       execute would be a good place to start
 
@@ -165,34 +168,6 @@ void pushNode(JobNode_t** head, char* jobStr, int pgid, int status){
 
 /**
  * Purpose:
- *   Pop JobNode off background stack
- * 
- * Args:
- *   head (JobNode_t**): Pointer to job stack head pointer
- *   
- * Returns:
- *   (int): Process group ID, -1 if failed
- */
-int popNode(JobNode_t** head){
-  const int INVALID = -1;
-  JobNode_t* curr;
-  int popped;
-
-  if(*head == NULL){
-    return INVALID;
-  }
-
-  curr = (*head)->next;
-  popped = (*head)->pgid;
-  free((*head)->jobStr);
-  free(*head);
-  *head = curr;
-
-  return popped;
-}
-
-/**
- * Purpose:
  *   Change state of completed jobs in job stack
  * 
  * Args:
@@ -259,6 +234,29 @@ void printDoneJobs(JobNode_t** head){
 }
 
 /**
+ * Purpose: Print jobStr of job by pgid
+ * 
+ * Args:
+ *   head (JobNode_t**): Pointer to job stack head pointer
+ *   id           (int): PGID of job string to print
+ * 
+ * Returns:
+ *   None
+ */
+void printJobStr(JobNode_t** head, int id){
+
+  JobNode_t* curr = *head;
+  
+  while(curr != NULL){
+    if(curr->pgid == id){
+      printf("%s\n", curr->jobStr);
+    }
+    curr = curr->next;
+  }
+  return;
+}
+
+/**
  * Purpose:
  *   Print stack of background jobs
  * 
@@ -269,6 +267,7 @@ void printDoneJobs(JobNode_t** head){
  *   None
  */
 void printStack(JobNode_t** head){
+  // TODO: Reverse stack print order
   const int RUN_VAL = 0;
   const int STOPPED_VAL = 1;
   const int DONE_VAL = 2;
@@ -462,6 +461,7 @@ static void sigintHandler(int sigNum){
  *   None
  */
 static void sigtstpHandler(int sigNum){
+  // TODO: Fix Ctrl+Z double prompt print bug
   const int STOPPED = 1;
   const char* PROMPT = "# ";
 
@@ -469,8 +469,9 @@ static void sigtstpHandler(int sigNum){
     killpg(pgrp, SIGTSTP);
     pushNode(jobStack, fgProc, pgrp, STOPPED);
 	}
-  printf("\n%s", PROMPT);
-
+  else{
+    printf("\n%s", PROMPT);
+  }
   // reset handler
   signal(SIGTSTP, sigtstpHandler);
   
@@ -539,9 +540,12 @@ int checkTokens(char* input, int maxLineLen, int maxTokenLen){
  *   (int): Returns 1 if string is valid, 0 if string is invalid
  */
 int checkInput(char* input){
+  // TODO: Protect against these cases < ls, > ls, 2> ls, | ls, & ls
   // TODO: Add function to ensure file redir goes to a file e.g.:# cat hello.txt >
   // TODO: Add function to ensure pipe goes to a valid command e.g.:# ls |
   // TODO: Add input verification to ensure that bg, fg, & are at expected indices
+  
+
   const int MAX_LINE_LEN = 2001;
   const int MAX_TOKEN_LEN = 31;
   const int INVALID = 0;
@@ -679,7 +683,7 @@ void redirectFile(char** cmd){
   }
   if(outIndex != INVALID){
     if((fdOut = open(cmd[outIndex], O_CREAT | O_WRONLY | O_TRUNC,
-        S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
+        S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH)) == INVALID){ 
       perror(cmd[outIndex]);
       exit(EXIT_FAILURE);
     }
@@ -688,7 +692,7 @@ void redirectFile(char** cmd){
   }
   if(errIndex != INVALID){
     if((fdErr = open(cmd[errIndex], O_CREAT | O_WRONLY | O_TRUNC,
-        S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
+        S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH)) == INVALID){ 
       perror(cmd[errIndex]);
       exit(EXIT_FAILURE);
     }
@@ -857,16 +861,19 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
  *   None
  */ 
 void runForeground(JobNode_t** head){
+  // TODO: Running fg on non background (&) jobs doesn't stop terminal
+  // tcsetpgrp() may be the solution
   const int NOT_FOUND = -1;
 
   int notStoppedOnly = 0;
   int recent = findRecent(head, notStoppedOnly);
 
   if(recent != NOT_FOUND){
+    printJobStr(head, recent);
     removeJob(head, recent);
     kill(recent, SIGCONT);
     
-    waitpid(recent,NULL,WUNTRACED);
+    waitpid(recent, NULL, WCONTINUED | WUNTRACED);
   }
 
 	return;
@@ -883,10 +890,10 @@ void runForeground(JobNode_t** head){
  *   None
  */ 
 void runBackground(JobNode_t** head){
+  // TODO: Add & to end of jobStr when sending to bg
   const int INVALID = -1;
   const int RUNNING = 0;
   const char CURRENT = '+';
-  const char* RUN_STR = "Running";
 
   int stoppedOnly = 1;
   int recent = findRecent(head, stoppedOnly);
@@ -894,8 +901,7 @@ void runBackground(JobNode_t** head){
   if(recent != INVALID){
     kill(recent, SIGCONT);
     changeJobStatus(head, recent, RUNNING);
-    printf("[%d]%c  %s         %s \n", (*jobStack)->jobId, CURRENT, RUN_STR,
-           (*jobStack)->jobStr);
+    printf("[%d]%c %s\n", (*jobStack)->jobId, CURRENT, (*jobStack)->jobStr);
   }
 
 	return;
