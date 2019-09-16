@@ -439,9 +439,7 @@ void removeDoneJobs(JobNode_t** head){
  */
 static void sigintHandler(int sigNum){
   const char* PROMPT = "# ";
-  printf("\nSIGINT\n");
-  printf("PGID: %d\n", getpgid(0));
-  printf("pgrp: %d\n", pgrp);
+
 	if(pgrp != -1){
     killpg(pgrp, SIGINT);
 	}
@@ -451,6 +449,7 @@ static void sigintHandler(int sigNum){
   }
   // reset handler
   signal(SIGINT, sigintHandler);
+
   return;
 }
 
@@ -470,9 +469,6 @@ static void sigtstpHandler(int sigNum){
   const char* PROMPT = "# ";
   const char* STOP_STR = "Stopped";
   
-  printf("\nSIGTSTP\n");
-  printf("PGID: %d\n", getpgid(0));
-  printf("pgrp: %d\n", pgrp);
 	if((pgrp != -1) && !findID(jobStack, pgrp)){
     killpg(pgrp, SIGTSTP);
     pushNode(jobStack, fgProc, pgrp, STOPPED);
@@ -499,7 +495,6 @@ static void sigtstpHandler(int sigNum){
  */
 static void sigchldHandler(int sigNum){
   // printf("\nSIGCHLD EXECUTED\n");
-
   signal(SIGCHLD, sigchldHandler);
 }
 
@@ -718,7 +713,7 @@ void redirectFile(char** cmd){
  *   None
  */
 void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
-  // TODO: (WIP) Implement job control
+  // TODO: Change execvp to execvpe
   // TODO: Investigate WNOHANG waitpid flag
   const int MAX_LINE_LEN = 2001;
   const int RUNNING = 0;
@@ -821,9 +816,6 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
     } 
 
     setpgid(0,0);
-    int pgid = getpgid(0);
-    printf("Child 1 PGID: %d\n", pgid);
-
     dup2(pfd[1], 1);
     close(pfd[0]);
     redirectFile(cmd1);
@@ -882,7 +874,7 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
     // Add background job to stack
     pushNode(head, input, pgrp, RUNNING);
 
-    // TODO: Check if txsetpgrp is needed
+    // TODO: Check if tcsetpgrp is needed
     // tcsetpgrp(0, pidCh1);
     // waitID = waitpid(-1, &status, WNOHANG);
     // printf("waitID: %d\n", waitID);
@@ -910,7 +902,7 @@ void runForeground(JobNode_t** head){
     waitpid(recent,NULL,WUNTRACED);
   }
   else{
-    printf("no valid jobs for fg\n");
+    printf("No jobs to send to foreground\n");
   }
 	return;
 }
@@ -930,7 +922,6 @@ void runBackground(JobNode_t** head){
   const int RUNNING = 0;
   int stoppedOnly = 1;
   int recent = findRecent(head, stoppedOnly);
-  printf("BG RECENT: %d", recent);
   if(recent != INVALID){
     // kill(recent, SIGTTIN);
     kill(recent, SIGCONT);
@@ -938,7 +929,7 @@ void runBackground(JobNode_t** head){
     // signal(SIGINT,SIG_IGN);
   }
   else{
-    printf("no valid jobs for bg\n");
+    printf("No jobs to send to background\n");
   }
 	return;
 }
@@ -981,13 +972,11 @@ void manageJobs(char** cmd, char* input, JobNode_t** head){
   } 
   else if(!strcmp(cmd[0], BG_TOK)){
     // execute bg
-    printf("RUNNING BG\n");
     runBackground(head);
     return;
   }
   else if(!strcmp(cmd[0], FG_TOK)){
     // execute fg
-    printf("RUNNING FG\n");
     runForeground(head);
     return;
   }
@@ -1052,13 +1041,11 @@ void managePipeJobs(char** cmd1, char** cmd2, char* input, JobNode_t** head){
   } 
   else if(!strcmp(cmd1[0], BG_TOK) || !strcmp(cmd2[0], BG_TOK)){
     // execute bg
-    printf("RUNNING BG\n");
     runBackground(head);
     return;
   }
   else if(!strcmp(cmd1[0], FG_TOK) || !strcmp(cmd2[0], FG_TOK)){
     // execute fg
-    printf("RUNNING FG\n");
     runForeground(head);
     return;
   }
