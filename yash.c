@@ -717,7 +717,6 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
   // TODO: Investigate WNOHANG waitpid flag
   const int MAX_LINE_LEN = 2001;
   const int RUNNING = 0;
-  const char NEW_LINE = '\n';
 
   int status;
   int pidCh1 = fork();
@@ -739,7 +738,6 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
     redirectFile(cmd);
     execvp(cmd[0], cmd);
 
-    printf("%c", NEW_LINE);
     exit(EXIT_FAILURE);
   }
 
@@ -775,7 +773,6 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
 void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int back){
   const int MAX_LINE_LEN = 2001;
   const int RUNNING = 0;
-  const char NEW_LINE = '\n';
 
   int pidCh1;
   int pidCh2;
@@ -804,7 +801,6 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
     redirectFile(cmd1);
     execvp(cmd1[0], cmd1);
 
-    printf("%c", NEW_LINE);
     exit(EXIT_FAILURE);
   }
 
@@ -833,7 +829,6 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
     redirectFile(cmd2);
     execvp(cmd2[0], cmd2);
 
-    printf("%c", NEW_LINE);
     exit(EXIT_FAILURE);
   }
   // parent process
@@ -1050,7 +1045,6 @@ void managePipeJobs(char** cmd1, char** cmd2, char* input, JobNode_t** head){
  */
 void shell(void){
   const int MAX_LINE_LEN = 2001;
-  const char NEW_LINE = '\n';
   const char* PIPE = "|";
   const char* SPACE_CHAR = " ";
   const char* PROMPT = "# ";
@@ -1133,9 +1127,7 @@ void shell(void){
       }
       free(pipeArray);
     }
-    else{
-      printf("%c", NEW_LINE);
-    }
+
     free(input);
   }
 
