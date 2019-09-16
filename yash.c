@@ -329,6 +329,42 @@ void changeJobStatus(JobNode_t** head, int pgid, int newStatus){
 
 /**
  * Purpose:
+ *   Remove job by pid from job stack
+ * 
+ * Args:
+ *   head (JobNode_t**): Pointer to job stack head pointer
+ *   pgid         (int): PGID of process to remove
+ * 
+ * Returns:
+ *   None
+ */ 
+void removeJob(JobNode_t** head, int pgid){
+  JobNode_t* curr = *head;
+  JobNode_t* temp = NULL;
+  if(curr == NULL){
+    return;
+  }
+  temp = curr->next;
+  if(curr->pgid == pgid){
+    free(curr->jobStr);
+    free(curr);
+    *head = temp;
+    return;
+  }
+  while(temp != NULL){
+    if(temp->pgid == pgid){
+      curr->next = temp->next;
+      free(temp->jobStr);
+      free(temp);
+      return;
+    }
+    temp = temp->next;
+  }
+  return;
+}
+
+/**
+ * Purpose:
  *   Change running status of job in job stack
  * 
  * Args:
@@ -344,6 +380,7 @@ void removeDoneJobs(JobNode_t** head){
   JobNode_t* temp = curr->next;
 
   while((curr != NULL) && (curr->status == DONE)){
+    free(curr->jobStr);
     free(curr);
 
     curr = temp;
@@ -364,6 +401,7 @@ void removeDoneJobs(JobNode_t** head){
       if(temp->status == DONE){
         curr->next = temp->next;
 
+        free(temp->jobStr);
         free(temp);
         temp = curr->next;
       }
@@ -391,7 +429,7 @@ void removeDoneJobs(JobNode_t** head){
 static void sigintHandler(int sigNum){
   const char* PROMPT = "# ";
   printf("\nSIGINT\n");
-  printf("PGID: %d\n", getpid());
+  printf("PGID: %d\n", getpgid(0));
   printf("pgrp: %d\n", pgrp);
 	if(pgrp != -1){
     killpg(pgrp, SIGINT);
@@ -422,7 +460,7 @@ static void sigtstpHandler(int sigNum){
   const char* STOP_STR = "Stopped";
   
   printf("\nSIGTSTP\n");
-  printf("PGID: %d\n", getpid());
+  printf("PGID: %d\n", getpgid(0));
   printf("pgrp: %d\n", pgrp);
 	if((pgrp != -1) && !findID(jobStack, pgrp)){
     killpg(pgrp, SIGTSTP);
@@ -772,7 +810,7 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
     } 
 
     setpgid(0,0);
-    int pgid = getpid(0);
+    int pgid = getpgid(0);
     printf("Child 1 PGID: %d\n", pgid);
 
     dup2(pfd[1], 1);
@@ -806,7 +844,7 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
     } 
     
     setpgid(0, pidCh1);
-    int one = getpid(0);
+    int one = getpgid(0);
     printf("Child 2 pgid: %d", one);
     dup2(pfd[0], 0);
     close(pfd[1]);
@@ -852,8 +890,16 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
  *   None
  */ 
 void runForeground(JobNode_t** head){
+  const int NOT_FOUND = -1;
   int recent = findRecent(head);
-  kill(recent, SIGCONT);
+  if(recent != NOT_FOUND){
+    removeJob(head, recent);
+    kill(recent, SIGCONT);
+    waitpid(recent,NULL,WUNTRACED);
+  }
+  else{
+    printf("no valid jobs for fg\n");
+  }
 	// // printf("IN fg");
 	// // printf("IN kjob");
 	// int count = 0, i;
@@ -905,35 +951,35 @@ void runForeground(JobNode_t** head){
 void run_bg(JobNode_t** head){
 	// printf("IN bg");
 	// printf("IN kjob");
-	int count = 0, i;
-	for ( i = 0; args[i] != NULL; ++i)
-		count = count + 1;
-	// printf("%d\n", count );
+	// int count = 0, i;
+	// for ( i = 0; args[i] != NULL; ++i)
+	// 	count = count + 1;
+	// // printf("%d\n", count );
 
-	if(count >=3)
-			fprintf(stderr,RED "bg: Too many arguments\nUsage: bg <jobNumber>\n" RESET);
-	else if(count <= 1)
-			fprintf(stderr,RED "bg: Too few arguments\nUsage: bg <jobNumber>\n" RESET);
-	else
-	{
+	// if(count >=3)
+	// 		fprintf(stderr,RED "bg: Too many arguments\nUsage: bg <jobNumber>\n" RESET);
+	// else if(count <= 1)
+	// 		fprintf(stderr,RED "bg: Too few arguments\nUsage: bg <jobNumber>\n" RESET);
+	// else
+	// {
 
-		int inC = atoi(args[1]);
-		qjob* job_node = getjob(head, inC);
-		if(job_node !=NULL)
-		{
-			int pid = job_node -> pid;
-			int flag = 1;
-			kill(pid, SIGTTIN);
-			kill(pid, SIGCONT);
-			changestatLL(head,pid,1);
-			// signal(SIGINT,SIG_IGN);
-		}
-		else
-		{
-			fprintf(stderr,RED "bg: No such pid exists\n" RESET);
-		}
+	// 	int inC = atoi(args[1]);
+	// 	qjob* job_node = getjob(head, inC);
+	// 	if(job_node !=NULL)
+	// 	{
+	// 		int pid = job_node -> pid;
+	// 		int flag = 1;
+	// 		kill(pid, SIGTTIN);
+	// 		kill(pid, SIGCONT);
+	// 		changestatLL(head,pid,1);
+	// 		// signal(SIGINT,SIG_IGN);
+	// 	}
+	// 	else
+	// 	{
+	// 		fprintf(stderr,RED "bg: No such pid exists\n" RESET);
+	// 	}
 
-	}
+	// }
 
 	return;
 }
@@ -982,6 +1028,7 @@ void manageJobs(char** cmd, char* input, JobNode_t** head){
   else if(!strcmp(cmd[0], FG_TOK)){
     // execute fg
     printf("RUNNING FG\n");
+    runForeground(head);
     return;
   }
   else if(!strcmp(cmd[lastIndex], BACKGROUND)){
@@ -1051,6 +1098,7 @@ void managePipeJobs(char** cmd1, char** cmd2, char* input, JobNode_t** head){
   else if(!strcmp(cmd1[0], FG_TOK) || !strcmp(cmd2[0], FG_TOK)){
     // execute fg
     printf("RUNNING FG\n");
+    runForeground(head);
     return;
   }
   else if(!strcmp(cmd2[lastIndex], BACKGROUND)){
