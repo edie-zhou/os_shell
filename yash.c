@@ -28,88 +28,9 @@ typedef struct JobNode_t{
   struct JobNode_t* next;
 }JobNode_t;
 
-int pidCh1 = -1;
-int pidCh2 = -1;
-int stopped = -1;
-
-/**
- * Purpose:
- *   Handler for SIGKILL signal
- * 
- * Args:
- *   sigNum (int): Signal number
- * 
- * Returns:
- *   None
- */
-static void sigintHandler(int sigNum){
-  const char* PROMPT = "# ";
-  printf("\nSIGINT\n");
-  printf("PID: %d\n", getpid());
-  printf("child1 pid: %d\n", pidCh1);
-  printf("child2 pid: %d\n", pidCh2);
-	if (pidCh2 != -1){
-		kill(pidCh2, SIGINT);
-    kill(pidCh1, SIGINT);
-	}
-  else if (pidCh1 != -1){
-    kill(pidCh1, SIGINT);
-	}
-  else{
-    printf("%s", PROMPT);
-		return;
-  }
-  // reset handler
-  signal(SIGINT, sigintHandler);
-  return;
-}
-
-/**
- * Purpose:
- *   Handler for SIGTSTP signal
- * 
- * Args:
- *   sigNum (int): Signal number
- * 
- * Returns:
- *   None
- */
-static void sigtstpHandler(int sigNum){
-  // TODO: Change handler to background process instead of killing
-  const char* PROMPT = "# ";
-  printf("\nSIGTSTP\n");
-  printf("PID: %d\n", getpid());
-  printf("child1 pid: %d\n", pidCh1);
-  printf("child2 pid: %d\n", pidCh2);
-	if (pidCh2 != -1){
-		kill(pidCh2, SIGTSTP);
-    kill(pidCh1, SIGTSTP);
-	}
-  else if (pidCh1 != -1){
-    kill(pidCh1, SIGTSTP);
-	}
-  else{
-		printf("%s", PROMPT);
-  }
-  // reset handler
-  signal(SIGTSTP, sigtstpHandler);
-  return;
-}
-
-/**
- * Purpose:
- *   Handler for SIGCHLD signals
- * 
- * Args:
- * 
- * Returns:
- *   None
- */
-static void sigchldHandler(int sigNum){
-  // printf("\nSIGCHLD EXECUTED\n");
-
-  signal(SIGCHLD, sigchldHandler);
-}
+JobNode_t** jobStack = NULL;
+int pgrp = -1;
+char* fgProc;
 
 /**
  * Purpose:
@@ -134,6 +55,47 @@ int countNodes(JobNode_t** head){
 
 /**
  * Purpose:
+ *   Check if job is already in job stack
+ * 
+ * Args:
+ *   head (JobNode_t**): Pointer to job stack head pointer
+ *   id           (int): Process group ID to look for
+ * 
+ * Returns:
+ *   (int): 1 if job is already in stack
+ */ 
+int findID(JobNode_t** head, int id){
+  const int FOUND = 1;
+  const int NOT_FOUND = 0;
+
+  JobNode_t* curr = *head;
+  
+  while(curr != NULL){
+    if(curr->pid == id){
+      return FOUND;
+    }
+    curr = curr->next;
+  }
+
+  return NOT_FOUND;
+}
+
+/**
+ * Purpose:
+ *   Free job stack node memory
+ * 
+ * Args:
+ *   head (JobNode_t**): Pointer to job stack head pointer
+ * 
+ * Returns:
+ *   None
+ */ 
+// int freeJobStack(JobNode_t** head){
+//   return;
+// }
+
+/**
+ * Purpose:
  *   Push JobNode to background stack
  * 
  * Args:
@@ -151,7 +113,7 @@ void pushNode(JobNode_t** head, char* jobStr, int pid, int status){
   curr->jobStr = (char*)malloc(2001 * sizeof(char));
   strcpy(curr->jobStr, jobStr);
   curr->pid = pid;
-  if (*head == NULL){
+  if(*head == NULL){
     curr->jobId = 1;
   }
   else{
@@ -178,7 +140,7 @@ int popNode(JobNode_t** head){
   JobNode_t* curr;
   int popped;
 
-  if (*head == NULL){
+  if(*head == NULL){
     return INVALID;
   }
 
@@ -241,15 +203,15 @@ void printDoneJobs(JobNode_t** head){
   }
 
   while(curr != NULL){
-    if (curr->jobId == currentJobID){
+    if(curr->jobId == currentJobID){
       currentJob = CURRENT;
     }
     else{
       currentJob = BACK;
     }
 
-    if (curr->status == DONE_VAL){
-      printf("[%d] %c %s         %s \n", curr->jobId, currentJob, DONE_TXT,
+    if(curr->status == DONE_VAL){
+      printf("[%d]%c  %s            %s \n", curr->jobId, currentJob, DONE_TXT,
              curr->jobStr);
     }
 
@@ -277,7 +239,6 @@ void printStack(JobNode_t** head){
   const char* RUN_TXT = "RUNNING";
   const char* STOP_TXT = "STOPPED";
   const char* DONE_TXT = "DONE";
-  const char* status;
 
   char currentJob;
   int currentID;
@@ -288,25 +249,25 @@ void printStack(JobNode_t** head){
   }
 
   while(curr != NULL){
-    if (curr->jobId == currentID){
+    if(curr->jobId == currentID){
       currentJob = CURRENT;
     }
     else{
       currentJob = BACK;
     }
 
-    if (curr->status == RUN_VAL){
-      status = RUN_TXT;
-    }
-    else if (curr->status == STOPPED_VAL){
-      status = STOP_TXT;
-    }
-    else if (curr->status == DONE_VAL){
-      status = DONE_TXT;
-    }
-
-    printf("[%d] %c %s         %s \n", curr->jobId, currentJob, status,
+    if(curr->status == RUN_VAL){
+      printf("[%d]%c  %s         %s \n", curr->jobId, currentJob, RUN_TXT,
            curr->jobStr);
+    }
+    else if(curr->status == STOPPED_VAL){
+      printf("[%d]%c  %s         %s \n", curr->jobId, currentJob, STOP_TXT,
+           curr->jobStr);
+    }
+    else if(curr->status == DONE_VAL){
+      printf("[%d]%c  %s            %s \n", curr->jobId, currentJob, DONE_TXT,
+           curr->jobStr);
+    }
     curr = curr->next;
   }
   return;
@@ -390,6 +351,82 @@ void removeDoneJobs(JobNode_t** head){
   }
 }
 
+/**
+ * Purpose:
+ *   Handler for SIGKILL signal
+ * 
+ * Args:
+ *   sigNum (int): Signal number
+ * 
+ * Returns:
+ *   None
+ */
+static void sigintHandler(int sigNum){
+  const char* PROMPT = "# ";
+  printf("\nSIGINT\n");
+  printf("PID: %d\n", getpid());
+  printf("pgrp: %d\n", pgrp);
+	if(pgrp != -1){
+    killpg(pgrp, SIGINT);
+	}
+  else{
+    printf("%s", PROMPT);
+		return;
+  }
+  // reset handler
+  signal(SIGINT, sigintHandler);
+  return;
+}
+
+/**
+ * Purpose:
+ *   Handler for SIGTSTP signal
+ * 
+ * Args:
+ *   sigNum (int): Signal number
+ * 
+ * Returns:
+ *   None
+ */
+static void sigtstpHandler(int sigNum){
+  const int STOPPED = 1;
+  const char CURRENT = '+';
+  const char* PROMPT = "# ";
+  const char* STOP_STR = "STOPPED";
+  
+  printf("\nSIGTSTP\n");
+  printf("PID: %d\n", getpid());
+  printf("pgrp: %d\n", pgrp);
+	if((pgrp != -1) && !findID(jobStack, pgrp)){
+    killpg(pgrp, SIGTSTP);
+    pushNode(jobStack, fgProc, pgrp, STOPPED);
+    printf("[%d]%c  %s         %s \n", (*jobStack)->jobId, CURRENT, STOP_STR,
+           (*jobStack)->jobStr);
+	}
+  else{
+		printf("%s", PROMPT);
+  }
+  // reset handler
+  signal(SIGTSTP, sigtstpHandler);
+  
+  return;
+}
+
+/**
+ * Purpose:
+ *   Handler for SIGCHLD signals
+ * 
+ * Args:
+ * 
+ * Returns:
+ *   None
+ */
+static void sigchldHandler(int sigNum){
+  // printf("\nSIGCHLD EXECUTED\n");
+
+  signal(SIGCHLD, sigchldHandler);
+}
+
 /** 
  * Purpose:
  *   Verify that tokens in input line do not exceed maximum token length
@@ -409,10 +446,10 @@ int checkTokens(char* input, int maxLineLen, int maxTokenLen){
   int tokenLen = 0;
   int k = 0;
   while(k < strlen(input)){
-    if (tokenLen >= maxTokenLen){
+    if(tokenLen >= maxTokenLen){
       return INVALID;
     }
-    else if ((tokenLen < maxTokenLen) && (input[k] == SPACE_CHAR)){
+    else if((tokenLen < maxTokenLen) && (input[k] == SPACE_CHAR)){
       tokenLen = 0;
     }
     else{
@@ -442,13 +479,13 @@ int checkInput(char* input){
   const int MAX_TOKEN_LEN = 31;
   const int INVALID = 0;
   const int VALID = 1;
-  if (strlen(input) > MAX_LINE_LEN){
+  if(strlen(input) > MAX_LINE_LEN){
     return INVALID;
   }
   else if(strlen(input) == 0){
     return INVALID;
   }
-  else if (!checkTokens(input, MAX_LINE_LEN, MAX_TOKEN_LEN)){
+  else if(!checkTokens(input, MAX_LINE_LEN, MAX_TOKEN_LEN)){
     return INVALID;
   }
   return VALID;
@@ -521,16 +558,16 @@ void changeRedirToks(char** cmd, int* inIndex, int* outIndex, int* errIndex){
 
   int index = 0;
   while(cmd[index] != NULL){
-    if (!strcmp(cmd[index], IN_REDIR)){
+    if(!strcmp(cmd[index], IN_REDIR)){
       *inIndex = index + 1;
       // Assign NULL to stop exec() from reading file redirection as part of cmd
       cmd[index] = NULL;
     }
-    else if (!strcmp(cmd[index], OUT_REDIR)){
+    else if(!strcmp(cmd[index], OUT_REDIR)){
       *outIndex = index + 1;
       cmd[index] = NULL;
     }
-    else if (!strcmp(cmd[index], ERR_REDIR)){
+    else if(!strcmp(cmd[index], ERR_REDIR)){
       *errIndex = index + 1;
       cmd[index] = NULL;
     }
@@ -561,16 +598,16 @@ void redirectFile(char** cmd){
 
   changeRedirToks(cmd, &inIndex, &outIndex, &errIndex);
 
-  if (inIndex != INVALID){
-    if ((fdIn = open(cmd[inIndex], O_RDONLY, 0)) == INVALID){
+  if(inIndex != INVALID){
+    if((fdIn = open(cmd[inIndex], O_RDONLY, 0)) == INVALID){
         perror(cmd[inIndex]);
         exit(EXIT_FAILURE);
     }
     dup2(fdIn, STDIN_FILENO);
     close(fdIn);
   }
-  if (outIndex != INVALID){
-    if ((fdOut = open(cmd[outIndex], O_CREAT | O_WRONLY | O_TRUNC,
+  if(outIndex != INVALID){
+    if((fdOut = open(cmd[outIndex], O_CREAT | O_WRONLY | O_TRUNC,
         S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
       perror(cmd[outIndex]);
       exit(EXIT_FAILURE);
@@ -578,8 +615,8 @@ void redirectFile(char** cmd){
     dup2(fdOut, STDOUT_FILENO);
     close(fdOut);
   }
-  if (errIndex != INVALID){
-    if ((fdErr = open(cmd[errIndex], O_CREAT | O_WRONLY | O_TRUNC,
+  if(errIndex != INVALID){
+    if((fdErr = open(cmd[errIndex], O_CREAT | O_WRONLY | O_TRUNC,
         S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == INVALID){ 
       perror(cmd[errIndex]);
       exit(EXIT_FAILURE);
@@ -597,7 +634,8 @@ void redirectFile(char** cmd){
  * 
  * Args: 
  *   cmd   (char**): Token array from command input
- *   head  (char**): Head of job stack
+ *   input  (char*): Command input C-string
+ *   head  (char**): Pointer to job stack head pointer
  *   back     (int): Boolean var indicating background status
  * 
  * Returns:
@@ -606,29 +644,32 @@ void redirectFile(char** cmd){
 void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
   // TODO: (WIP) Implement job control
   // TODO: Investigate WNOHANG waitpid flag
+  const int MAX_LINE_LEN = 2001;
   const int RUNNING = 0;
   const char NEW_LINE = '\n';
-  int status;
-  int waitID;
 
-  pidCh1 = fork();
-  if (pidCh1 < 0){
+  int status;
+  int pidCh1 = fork();
+
+  if(pidCh1 < 0){
     // fork failed; exit
     fprintf(stderr, "Fork failed\n");
     exit(EXIT_FAILURE);
   }
-  else if (pidCh1 == 0){
+  else if(pidCh1 == 0){
     // child (new process)
-    if (signal(SIGINT, sigintHandler) == SIG_ERR){
+    if(signal(SIGINT, sigintHandler) == SIG_ERR){
 	    printf("signal(SIGINT) error");
     }
-    if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
+    if(signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
     	printf("signal(SIGTSTP) error");
     }
 
-    // if (back) {
+    // TODO: Check if tcsetpgrp is needed
+    // if(back) {
     //   // tcsetpgrp(0, getpid());
     // }
+
     setpgid(0,0);
     redirectFile(cmd);
     execvp(cmd[0], cmd);
@@ -637,12 +678,15 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
     printf("%c", NEW_LINE);
     exit(EXIT_FAILURE);
   }
-  
+
   // parent process
-  if (!back){
+  pgrp = pidCh1;
+  free(fgProc);
+  fgProc = (char*)malloc(MAX_LINE_LEN * sizeof(char));
+  strcpy(fgProc, input);
+  if(!back){
     // If not background proc, wait to execution completion
-    waitID = waitpid(pidCh1, &status, WCONTINUED | WUNTRACED);
-    printf("waitID: %d\n", waitID);
+    waitpid(pidCh1, &status, WCONTINUED | WUNTRACED);
   }
   else{
     // Return to prompt for background process
@@ -651,6 +695,7 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
     // Add background job to stack
     pushNode(head, input, pidCh1, RUNNING);
 
+    // TODO: Check if txsetpgrp is needed
     // tcsetpgrp(0, pidCh1);
     // waitID = waitpid(-1, &status, WNOHANG);
     // printf("waitID: %d\n", waitID);
@@ -665,35 +710,37 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
  * Args: 
  *   cmd1 (char**): Token array for command before pipe
  *   cmd2 (char**): Token array for command after pipe
+ *   input (char*): Command input C-string
+ *   head (char**): Pointer to job stack head pointer
+ *   back    (int): Boolean var indicating background status
  * 
  * Returns:
  *   None
  */
-void executePipe(char** cmd1, char** cmd2){
+void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int back){
+  const int MAX_LINE_LEN = 2001;
+  const int RUNNING = 0;
   const char NEW_LINE = '\n';
-  // int pidCh1;
-  // int pidCh2;
+
+  int pidCh1;
+  int pidCh2;
   int status1;
   int status2;
-
   int pfd[2];
+
   pipe(pfd);
-
-  int fuck = getpgrp();
-  printf("Parent PGID: %d\n", fuck);
-
   pidCh1 = fork();
-  if (pidCh1 < 0) {
+  if(pidCh1 < 0) {
     // fork failed; exit
     fprintf(stderr, "Fork failed\n");
     exit(EXIT_FAILURE);
   }
-  else if (pidCh1 == 0){
+  else if(pidCh1 == 0){
     // child 1 (new process)
-    if (signal(SIGINT, sigintHandler) == SIG_ERR){
+    if(signal(SIGINT, sigintHandler) == SIG_ERR){
 	    printf("signal(SIGINT) error");
     }
-    if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
+    if(signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
     	printf("signal(SIGTSTP) error");
     } 
 
@@ -711,23 +758,29 @@ void executePipe(char** cmd1, char** cmd2){
     exit(EXIT_FAILURE);
   }
 
+  pgrp = pidCh1;
+  free(fgProc);
+  fgProc = (char*)malloc(MAX_LINE_LEN * sizeof(char));
+  strcpy(fgProc, input);
   pidCh2 = fork();
-  if (pidCh2 < 0){
+  if(pidCh2 < 0){
     // fork failed; exit
     fprintf(stderr, "Fork failed\n");
     exit(EXIT_FAILURE);
   }
-  else if (pidCh2 == 0){
+  else if(pidCh2 == 0){
     // child 2 (new process)
     // TODO: Find out if these handlers are needed
-    if (signal(SIGINT, sigintHandler) == SIG_ERR){
+    if(signal(SIGINT, sigintHandler) == SIG_ERR){
 	    printf("signal(SIGINT) error");
     }
-    if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
+    if(signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
     	printf("signal(SIGTSTP) error");
     } 
     
     setpgid(0, pidCh1);
+    int one = getpgid(0);
+    printf("Child 2 pgid: %d", one);
     dup2(pfd[0], 0);
     close(pfd[1]);
     redirectFile(cmd2);
@@ -737,13 +790,28 @@ void executePipe(char** cmd1, char** cmd2){
     printf("%c", NEW_LINE);
     exit(EXIT_FAILURE);
   }
-  // parent goes down this path (main)
-  printf("%d, %d\n", pidCh1, pidCh2);
-  setpgid(pidCh1, pidCh2);
+  // parent process
   close(pfd[0]);
   close(pfd[1]);
-  waitpid(-1, &status1, WCONTINUED | WUNTRACED);
-  waitpid(-1, &status2, WCONTINUED | WUNTRACED);
+  
+  if(!back){
+    // If not background proc, wait to execution completion
+    waitpid(pidCh1, &status1, WCONTINUED | WUNTRACED);
+    waitpid(pidCh2, &status2, WCONTINUED | WUNTRACED);
+  }
+  else{
+    // Return to prompt for background process
+    fprintf(stderr, "Starting background process\n");
+
+    // Add background job to stack
+    pushNode(head, input, pgrp, RUNNING);
+
+    // TODO: Check if txsetpgrp is needed
+    // tcsetpgrp(0, pidCh1);
+    // waitID = waitpid(-1, &status, WNOHANG);
+    // printf("waitID: %d\n", waitID);
+    // tcsetpgrp(0, getpid());
+  }
 }
 
 /**
@@ -773,34 +841,32 @@ void manageJobs(char** cmd, char* input, JobNode_t** head){
   }
   lastIndex--;
 
-  if (strcmp(cmd[0], JOBS_TOK) == 0){
+  if(strcmp(cmd[0], JOBS_TOK) == 0){
     // print job stack
-    if ((*head) != NULL){
-      printf("RUNNING JOBS\n");
+    if((*head) != NULL){
       checkDoneJobs(head);
       printStack(head);
       removeDoneJobs(head);
     }
     return;
   } 
-  else if (!strcmp(cmd[0], BG_TOK)){
+  else if(!strcmp(cmd[0], BG_TOK)){
     // execute bg
     printf("RUNNING BG\n");
     return;
   }
-  else if (!strcmp(cmd[0], FG_TOK)){
+  else if(!strcmp(cmd[0], FG_TOK)){
     // execute fg
     printf("RUNNING FG\n");
     return;
   }
-  else if (!strcmp(cmd[lastIndex], BACKGROUND)){
+  else if(!strcmp(cmd[lastIndex], BACKGROUND)){
     // execute in background
-    printf("RUNNING &\n");
     cmd[lastIndex] = NULL;
     backState = 1;
 
     // print done jobs
-    if ((*head) != NULL){
+    if((*head) != NULL){
       checkDoneJobs(head);
       printDoneJobs(head);
       removeDoneJobs(head);
@@ -818,6 +884,75 @@ void manageJobs(char** cmd, char* input, JobNode_t** head){
 
 /**
  * Purpose:
+ *   Manages pipe jobs based on user input
+ *     * bg, fg should be at input[0]
+ *     * & should be at input[numTokens - 1]
+ * 
+ * Args:
+ *   cmd1      (char**): Token array from first command
+ *   cmd2      (char**): Token array from second command
+ *   input      (char*): Input C-string
+ *   head (JobNode_t**): Pointer to stack head pointer
+ * 
+ * Returns:
+ *   None
+ */
+void managePipeJobs(char** cmd1, char** cmd2, char* input, JobNode_t** head){
+  const char* BACKGROUND = "&";
+  const char* BG_TOK = "bg";
+  const char* FG_TOK = "fg";
+  const char* JOBS_TOK = "jobs";
+  int backState = 0;
+
+  int lastIndex = 0;
+  while(cmd2[lastIndex] != NULL){
+    lastIndex++;
+  }
+  lastIndex--;
+
+  if(strcmp(cmd1[0], JOBS_TOK) == 0){
+    // print job stack
+    if((*head) != NULL){
+      checkDoneJobs(head);
+      printStack(head);
+      removeDoneJobs(head);
+    }
+    return;
+  } 
+  else if(!strcmp(cmd1[0], BG_TOK) || !strcmp(cmd2[0], BG_TOK)){
+    // execute bg
+    printf("RUNNING BG\n");
+    return;
+  }
+  else if(!strcmp(cmd1[0], FG_TOK) || !strcmp(cmd2[0], FG_TOK)){
+    // execute fg
+    printf("RUNNING FG\n");
+    return;
+  }
+  else if(!strcmp(cmd2[lastIndex], BACKGROUND)){
+    // execute in background
+    cmd2[lastIndex] = NULL;
+    backState = 1;
+
+    // print done jobs
+    if((*head) != NULL){
+      checkDoneJobs(head);
+      printDoneJobs(head);
+      removeDoneJobs(head);
+    }
+    executePipe(cmd1, cmd2, input, head, backState);
+    return;
+  }
+  else{
+    // execute normally
+    backState = 0;
+    executePipe(cmd1, cmd2, input, head, backState);
+    return;
+  }
+}
+
+/**
+ * Purpose:
  *   Loops yash shell until user terminates program (CTRL+D)
  * 
  * Args:
@@ -826,52 +961,46 @@ void manageJobs(char** cmd, char* input, JobNode_t** head){
  * Returns:
  *   None
  */
-void shellLoop(void){
+void shell(void){
+  const int MAX_LINE_LEN = 2001;
   const char NEW_LINE = '\n';
   const char* PIPE = "|";
   const char* SPACE_CHAR = " ";
   const char* PROMPT = "# ";
+
   int validInput = 0;
-  int index;
-  
-  // Initialize job control stack
-  JobNode_t** jobStack = NULL;
-  jobStack = (JobNode_t**)malloc(sizeof(JobNode_t*));
-  *jobStack = NULL;
-
+  int index = -1;
   char* input;
-
-  // Reset pid's
-  pidCh1 = -1;
-  pidCh2 = -1;
-
-  int pgid = getpgrp();
-  printf("Shell PGID: %d\n", pgid);
-
+  
   // Block signals outside of shell
   signal(SIGINT, SIG_IGN);
   signal(SIGTSTP, SIG_IGN);
   signal(SIGTTIN, SIG_IGN);
   signal(SIGTTOU, SIG_IGN);
+  
+  // Initialize job control stack
+  jobStack = (JobNode_t**)malloc(sizeof(JobNode_t*));
+  *jobStack = NULL;
+
+  // Reset pgrp
+  pgrp = -1;
+  fgProc = (char*)malloc(MAX_LINE_LEN * sizeof(char));
 
   while(input = readline(PROMPT)){
-    if (signal(SIGINT, sigintHandler) == SIG_ERR){
+    if(signal(SIGINT, sigintHandler) == SIG_ERR){
       printf("signal(SIGINT) error");
     }
-    if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
+    if(signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
       printf("signal(SIGTSTP) error");
     } 
-    if (signal(SIGCHLD, sigchldHandler) == SIG_ERR){
+    if(signal(SIGCHLD, sigchldHandler) == SIG_ERR){
       printf("signal(SIGCHLD) error");
     } 
 
-    printf("***\n1: %d\n", pidCh1);
-    printf("2: %d\n***\n", pidCh2);
-
     validInput = checkInput(input);
-    if (validInput){
+    if(validInput){
       char** pipeArray = splitStrArray(input, PIPE);
-      if (pipeArray[1] == NULL){
+      if(pipeArray[1] == NULL){
         // no pipe
         char** cmd = splitStrArray(input, SPACE_CHAR);
 
@@ -889,7 +1018,7 @@ void shellLoop(void){
         char** cmd1 = splitStrArray(pipeArray[0], SPACE_CHAR);
         char** cmd2 = splitStrArray(pipeArray[1], SPACE_CHAR);
 
-        executePipe(cmd1, cmd2);
+        managePipeJobs(cmd1, cmd2, input, jobStack);
 
         index = 0;
         while(cmd1[index] != NULL){
@@ -913,8 +1042,10 @@ void shellLoop(void){
     free(input);
   }
 
-  // TODO: free jobStack nodes
   free(jobStack);
+  // TODO: free jobStack nodes
+  // freeJobStack();
+  free(fgProc);
 
   return;
 }
@@ -930,8 +1061,8 @@ void shellLoop(void){
  *   (int): 0 on exit success
  */
 int main (void){
-  
-  shellLoop();
+
+  shell();
 
   return 0;
 }
