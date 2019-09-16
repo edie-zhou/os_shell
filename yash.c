@@ -22,7 +22,7 @@
 typedef struct JobNode_t{
 	char* jobStr;
   int jobId;
-  int pid;
+  int pgid;
   int status; // or enum
 
   struct JobNode_t* next;
@@ -71,8 +71,35 @@ int findID(JobNode_t** head, int id){
   JobNode_t* curr = *head;
   
   while(curr != NULL){
-    if(curr->pid == id){
+    if(curr->pgid == id){
       return FOUND;
+    }
+    curr = curr->next;
+  }
+
+  return NOT_FOUND;
+}
+
+/**
+ * Purpose:
+ *   Find most recent job that is stopped or in background
+ * 
+ * Args:
+ *   head (JobNode_t**): Pointer to job stack head pointer
+ *   id           (int): Process group ID to look for
+ * 
+ * Returns:
+ *   (int): PGID of most recent stopped job
+ */ 
+int findRecent(JobNode_t** head){
+  const int STOPPED_VAL = 1;
+  const int NOT_FOUND = -1;
+
+  JobNode_t* curr = *head;
+  
+  while(curr != NULL){
+    if(curr->status == STOPPED_VAL){
+      return curr->pgid;
     }
     curr = curr->next;
   }
@@ -101,18 +128,18 @@ int findID(JobNode_t** head, int id){
  * Args:
  *   head  (JobNode_t**): Pointer to job stack head pointer
  *   jobStr      (char*): Job string
- *   pid           (int): Process group id of job
+ *   pgid          (int): Process group id of job
  *   status        (int): Running state of job
  * 
  * Returns:
  *   None
  */ 
-void pushNode(JobNode_t** head, char* jobStr, int pid, int status){
+void pushNode(JobNode_t** head, char* jobStr, int pgid, int status){
   JobNode_t* curr = (JobNode_t*)malloc(sizeof(JobNode_t));
 
   curr->jobStr = (char*)malloc(2001 * sizeof(char));
   strcpy(curr->jobStr, jobStr);
-  curr->pid = pid;
+  curr->pgid = pgid;
   if(*head == NULL){
     curr->jobId = 1;
   }
@@ -145,7 +172,7 @@ int popNode(JobNode_t** head){
   }
 
   curr = (*head)->next;
-  popped = (*head)->pid;
+  popped = (*head)->pgid;
   free((*head)->jobStr);
   free(*head);
   *head = curr;
@@ -165,12 +192,12 @@ int popNode(JobNode_t** head){
  */
 void checkDoneJobs(JobNode_t** head){
   const int DONE_VAL = 2;
-  int jobPID;
+  int jobPGID;
   JobNode_t* curr = *head;
 
   while(curr != NULL){
-    jobPID = waitpid(curr->pid, NULL, WNOHANG);
-    if(jobPID == curr->pid){
+    jobPGID = waitpid(curr->pgid, NULL, WNOHANG);
+    if(jobPGID == curr->pgid){
       curr->status = DONE_VAL;
     }
     curr = curr->next;
@@ -192,7 +219,7 @@ void printDoneJobs(JobNode_t** head){
   const int DONE_VAL = 2;
   const char CURRENT = '+';
   const char BACK = '-';
-  const char* DONE_TXT = "DONE";
+  const char* DONE_TXT = "Done";
 
   char currentJob;
   int currentJobID;
@@ -236,9 +263,9 @@ void printStack(JobNode_t** head){
   const int DONE_VAL = 2;
   const char CURRENT = '+';
   const char BACK = '-';
-  const char* RUN_TXT = "RUNNING";
-  const char* STOP_TXT = "STOPPED";
-  const char* DONE_TXT = "DONE";
+  const char* RUN_TXT = "Running";
+  const char* STOP_TXT = "Stopped";
+  const char* DONE_TXT = "Done";
 
   char currentJob;
   int currentID;
@@ -279,18 +306,18 @@ void printStack(JobNode_t** head){
  * 
  * Args:
  *   head (JobNode_t**): Pointer to job stack head pointer
- *   pid          (int): Process group ID
+ *   pgid         (int): Process group ID
  *   newStatus    (int): New running status of process
  * 
  * Returns:
  *   None
  */ 
-void changeJobStatus(JobNode_t** head, int pid, int newStatus){
+void changeJobStatus(JobNode_t** head, int pgid, int newStatus){
   JobNode_t* temp = *head;
   int changed = 0;
 
   while((!changed)&&(temp != NULL)){
-    if(temp->pid == pid){
+    if(temp->pgid == pgid){
       changed = 1;
       temp->status = newStatus;
     }
@@ -364,7 +391,7 @@ void removeDoneJobs(JobNode_t** head){
 static void sigintHandler(int sigNum){
   const char* PROMPT = "# ";
   printf("\nSIGINT\n");
-  printf("PID: %d\n", getpid());
+  printf("PGID: %d\n", getpid());
   printf("pgrp: %d\n", pgrp);
 	if(pgrp != -1){
     killpg(pgrp, SIGINT);
@@ -392,10 +419,10 @@ static void sigtstpHandler(int sigNum){
   const int STOPPED = 1;
   const char CURRENT = '+';
   const char* PROMPT = "# ";
-  const char* STOP_STR = "STOPPED";
+  const char* STOP_STR = "Stopped";
   
   printf("\nSIGTSTP\n");
-  printf("PID: %d\n", getpid());
+  printf("PGID: %d\n", getpid());
   printf("pgrp: %d\n", pgrp);
 	if((pgrp != -1) && !findID(jobStack, pgrp)){
     killpg(pgrp, SIGTSTP);
@@ -745,7 +772,7 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
     } 
 
     setpgid(0,0);
-    int pgid = getpgid(0);
+    int pgid = getpid(0);
     printf("Child 1 PGID: %d\n", pgid);
 
     dup2(pfd[1], 1);
@@ -779,7 +806,7 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
     } 
     
     setpgid(0, pidCh1);
-    int one = getpgid(0);
+    int one = getpid(0);
     printf("Child 2 pgid: %d", one);
     dup2(pfd[0], 0);
     close(pfd[1]);
@@ -812,6 +839,103 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
     // printf("waitID: %d\n", waitID);
     // tcsetpgrp(0, getpid());
   }
+}
+
+/**
+ * Purpose:
+ *   Send SIGCONT to most recent job in job stack and run in foreground
+ * 
+ * Args:
+ *   head (JobNode_t**): Pointer to stack head pointer
+ * 
+ * Returns:
+ *   None
+ */ 
+void runForeground(JobNode_t** head){
+  int recent = findRecent(head);
+  kill(recent, SIGCONT);
+	// // printf("IN fg");
+	// // printf("IN kjob");
+	// int count = 0, i;
+	// for ( i = 0; args[i] != NULL; ++i)
+	// 	count = count + 1;
+	// // printf("%d\n", count );
+
+	// if(count >=3)
+	// 		fprintf(stderr,RED "fg: Too many arguments\nUsage: fg <jobNumber>\n" RESET);
+	// else if(count <= 1)
+	// 		fprintf(stderr,RED "fg: Too few arguments\nUsage: fg <jobNumber>\n" RESET);
+	// else
+	// {
+
+	// 	int inC = atoi(args[1]);
+	// 	qjob* job_node = getjob(head, inC);
+	// 	if(job_node !=NULL)
+	// 	{
+	// 		int pid = job_node -> pid;
+	// 		int flag = 1;
+	// 		kill(pid, SIGCONT);
+	// 		// kill(pid, SIGTTIN);
+	// 		// kill(pid, SIGTTOU);
+	// 		childPID = pid;	
+	// 		strcpy(nowProcess, job_node->name);
+	// 		removeLL(head, pid);
+	// 		// wait(NULL);
+	// 		waitpid(-1,NULL,WUNTRACED);
+	// 	}
+	// 	else
+	// 	{
+	// 		fprintf(stderr,RED "fg: No such pid exists\n" RESET);
+	// 	}
+	// }
+
+	return;
+}
+
+/**
+ * Purpose:
+ *   Send SIGCONT to most recent job in job stack and run in foreground
+ * 
+ * Args:
+ *   head (JobNode_t**): Pointer to stack head pointer
+ * 
+ * Returns:
+ *   None
+ */ 
+void run_bg(JobNode_t** head){
+	// printf("IN bg");
+	// printf("IN kjob");
+	int count = 0, i;
+	for ( i = 0; args[i] != NULL; ++i)
+		count = count + 1;
+	// printf("%d\n", count );
+
+	if(count >=3)
+			fprintf(stderr,RED "bg: Too many arguments\nUsage: bg <jobNumber>\n" RESET);
+	else if(count <= 1)
+			fprintf(stderr,RED "bg: Too few arguments\nUsage: bg <jobNumber>\n" RESET);
+	else
+	{
+
+		int inC = atoi(args[1]);
+		qjob* job_node = getjob(head, inC);
+		if(job_node !=NULL)
+		{
+			int pid = job_node -> pid;
+			int flag = 1;
+			kill(pid, SIGTTIN);
+			kill(pid, SIGCONT);
+			changestatLL(head,pid,1);
+			// signal(SIGINT,SIG_IGN);
+		}
+		else
+		{
+			fprintf(stderr,RED "bg: No such pid exists\n" RESET);
+		}
+
+	}
+
+	return;
 }
 
 /**
