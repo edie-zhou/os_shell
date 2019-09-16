@@ -1145,6 +1145,8 @@ void shell(void){
           index++;
         }
         free(cmd);
+
+        free(pipeArray[0]);
       }
       else{
         // pipe exists
@@ -1166,6 +1168,8 @@ void shell(void){
           index++;
         }
         free(cmd2);
+        free(pipeArray[0]);
+        free(pipeArray[1]);
       }
       free(pipeArray);
     }
