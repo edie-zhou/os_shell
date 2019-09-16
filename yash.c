@@ -443,10 +443,8 @@ static void sigintHandler(int sigNum){
 	if(pgrp != -1){
     killpg(pgrp, SIGINT);
 	}
-  else{
-    printf("%s", PROMPT);
-		return;
-  }
+  printf("\n%s", PROMPT);
+
   // reset handler
   signal(SIGINT, sigintHandler);
 
@@ -465,19 +463,14 @@ static void sigintHandler(int sigNum){
  */
 static void sigtstpHandler(int sigNum){
   const int STOPPED = 1;
-  const char CURRENT = '+';
   const char* PROMPT = "# ";
-  const char* STOP_STR = "Stopped";
-  
+
 	if((pgrp != -1) && !findID(jobStack, pgrp)){
     killpg(pgrp, SIGTSTP);
     pushNode(jobStack, fgProc, pgrp, STOPPED);
-    printf("[%d]%c  %s         %s \n", (*jobStack)->jobId, CURRENT, STOP_STR,
-           (*jobStack)->jobStr);
 	}
-  else{
-		printf("%s", PROMPT);
-  }
+  printf("\n%s", PROMPT);
+
   // reset handler
   signal(SIGTSTP, sigtstpHandler);
   
@@ -724,7 +717,6 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
 
   if(pidCh1 < 0){
     // fork failed; exit
-    fprintf(stderr, "Fork failed\n");
     exit(EXIT_FAILURE);
   }
   else if(pidCh1 == 0){
@@ -736,16 +728,10 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
     	printf("signal(SIGTSTP) error");
     }
 
-    // TODO: Check if tcsetpgrp is needed
-    // if(back) {
-    //   // tcsetpgrp(0, getpid());
-    // }
-
     setpgid(0,0);
     redirectFile(cmd);
     execvp(cmd[0], cmd);
 
-    fprintf(stderr, "Exec failed\n");
     printf("%c", NEW_LINE);
     exit(EXIT_FAILURE);
   }
@@ -760,17 +746,8 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
     waitpid(pidCh1, &status, WCONTINUED | WUNTRACED);
   }
   else{
-    // Return to prompt for background process
-    fprintf(stderr, "Starting background process\n");
-
     // Add background job to stack
     pushNode(head, input, pidCh1, RUNNING);
-
-    // TODO: Check if txsetpgrp is needed
-    // tcsetpgrp(0, pidCh1);
-    // waitID = waitpid(-1, &status, WNOHANG);
-    // printf("waitID: %d\n", waitID);
-    // tcsetpgrp(0, getpid());
   }
 }
 
@@ -803,7 +780,6 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
   pidCh1 = fork();
   if(pidCh1 < 0) {
     // fork failed; exit
-    fprintf(stderr, "Fork failed\n");
     exit(EXIT_FAILURE);
   }
   else if(pidCh1 == 0){
@@ -821,7 +797,6 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
     redirectFile(cmd1);
     execvp(cmd1[0], cmd1);
 
-    fprintf(stderr, "Exec failed\n");
     printf("%c", NEW_LINE);
     exit(EXIT_FAILURE);
   }
@@ -833,7 +808,6 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
   pidCh2 = fork();
   if(pidCh2 < 0){
     // fork failed; exit
-    fprintf(stderr, "Fork failed\n");
     exit(EXIT_FAILURE);
   }
   else if(pidCh2 == 0){
@@ -847,14 +821,11 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
     } 
     
     setpgid(0, pidCh1);
-    int one = getpgid(0);
-    printf("Child 2 pgid: %d", one);
     dup2(pfd[0], 0);
     close(pfd[1]);
     redirectFile(cmd2);
     execvp(cmd2[0], cmd2);
 
-    fprintf(stderr, "Exec failed\n");
     printf("%c", NEW_LINE);
     exit(EXIT_FAILURE);
   }
@@ -868,17 +839,8 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
     waitpid(pidCh2, &status2, WCONTINUED | WUNTRACED);
   }
   else{
-    // Return to prompt for background process
-    fprintf(stderr, "Starting background process\n");
-
     // Add background job to stack
     pushNode(head, input, pgrp, RUNNING);
-
-    // TODO: Check if tcsetpgrp is needed
-    // tcsetpgrp(0, pidCh1);
-    // waitID = waitpid(-1, &status, WNOHANG);
-    // printf("waitID: %d\n", waitID);
-    // tcsetpgrp(0, getpid());
   }
 }
 
@@ -899,10 +861,8 @@ void runForeground(JobNode_t** head){
   if(recent != NOT_FOUND){
     removeJob(head, recent);
     kill(recent, SIGCONT);
+    
     waitpid(recent,NULL,WUNTRACED);
-  }
-  else{
-    printf("No jobs to send to foreground\n");
   }
 	return;
 }
@@ -920,16 +880,15 @@ void runForeground(JobNode_t** head){
 void runBackground(JobNode_t** head){
   const int INVALID = -1;
   const int RUNNING = 0;
+  const char CURRENT = '+';
+  const char* RUN_STR = "Running";
   int stoppedOnly = 1;
   int recent = findRecent(head, stoppedOnly);
   if(recent != INVALID){
-    // kill(recent, SIGTTIN);
     kill(recent, SIGCONT);
     changeJobStatus(head, recent, RUNNING);
-    // signal(SIGINT,SIG_IGN);
-  }
-  else{
-    printf("No jobs to send to background\n");
+    printf("[%d]%c  %s         %s \n", (*jobStack)->jobId, CURRENT, RUN_STR,
+           (*jobStack)->jobStr);
   }
 	return;
 }
