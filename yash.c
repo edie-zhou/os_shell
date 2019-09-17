@@ -34,6 +34,63 @@ char* fgProc;
 
 /**
  * Purpose:
+ *   Push JobNode to background stack
+ * 
+ * Args:
+ *   head  (JobNode_t**): Pointer to job stack head pointer
+ *   jobStr      (char*): Job string
+ *   pgid          (int): Process group id of job
+ *   status        (int): Running state of job
+ * 
+ * Returns:
+ *   None
+ */ 
+void pushNode(JobNode_t** head, char* jobStr, int pgid, int status){
+  JobNode_t* curr = (JobNode_t*)malloc(sizeof(JobNode_t));
+
+  curr->jobStr = (char*)malloc(2001 * sizeof(char));
+  strcpy(curr->jobStr, jobStr);
+  curr->pgid = pgid;
+  if(*head == NULL){
+    curr->jobId = 1;
+  }
+  else{
+    curr->jobId = (*head)->jobId + 1;
+  }  
+  curr->status = status;
+  curr->next = *head;
+  *head = curr;
+  return;
+}
+
+/**
+ * Purpose:
+ *   Free job stack node memory
+ * 
+ * Args:
+ *   head (JobNode_t**): Pointer to job stack head pointer
+ * 
+ * Returns:
+ *   None
+ */ 
+void freeJobStack(JobNode_t** head){
+  JobNode_t* curr = *head;
+  JobNode_t* temp = NULL;
+
+  while(curr != NULL){
+    temp = curr;
+    curr = curr->next;
+    if(temp->jobStr != NULL)
+      free(temp->jobStr);
+    free(temp);
+    
+  }
+
+  return;
+}
+
+/**
+ * Purpose:
  *   Count number of nodes in stack
  * 
  * Args:
@@ -116,51 +173,6 @@ int findRecent(JobNode_t** head, int stoppedOnly){
   }
 
   return NOT_FOUND;
-}
-
-/**
- * Purpose:
- *   Free job stack node memory
- * 
- * Args:
- *   head (JobNode_t**): Pointer to job stack head pointer
- * 
- * Returns:
- *   None
- */ 
-// int freeJobStack(JobNode_t** head){
-//   return;
-// }
-
-/**
- * Purpose:
- *   Push JobNode to background stack
- * 
- * Args:
- *   head  (JobNode_t**): Pointer to job stack head pointer
- *   jobStr      (char*): Job string
- *   pgid          (int): Process group id of job
- *   status        (int): Running state of job
- * 
- * Returns:
- *   None
- */ 
-void pushNode(JobNode_t** head, char* jobStr, int pgid, int status){
-  JobNode_t* curr = (JobNode_t*)malloc(sizeof(JobNode_t));
-
-  curr->jobStr = (char*)malloc(2001 * sizeof(char));
-  strcpy(curr->jobStr, jobStr);
-  curr->pgid = pgid;
-  if(*head == NULL){
-    curr->jobId = 1;
-  }
-  else{
-    curr->jobId = (*head)->jobId + 1;
-  }  
-  curr->status = status;
-  curr->next = *head;
-  *head = curr;
-  return;
 }
 
 /**
@@ -777,12 +789,6 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
   }
   else if(pidCh1 == 0){
     // child (new process)
-    if(signal(SIGINT, sigintHandler) == SIG_ERR){
-	    printf("signal(SIGINT) error");
-    }
-    if(signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
-    	printf("signal(SIGTSTP) error");
-    }
 
     setpgid(0,0);
     redirectFile(cmd);
@@ -840,12 +846,6 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
   }
   else if(pidCh1 == 0){
     // child 1 (new process)
-    if(signal(SIGINT, sigintHandler) == SIG_ERR){
-	    printf("signal(SIGINT) error");
-    }
-    if(signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
-    	printf("signal(SIGTSTP) error");
-    } 
 
     setpgid(0,0);
     dup2(pfd[1], 1);
@@ -870,12 +870,6 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
   else if(pidCh2 == 0){
     // child 2 (new process)
     // TODO: Find out if these handlers are needed
-    if(signal(SIGINT, sigintHandler) == SIG_ERR){
-	    printf("signal(SIGINT) error");
-    }
-    if(signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
-    	printf("signal(SIGTSTP) error");
-    } 
     
     setpgid(0, pidCh1);
     dup2(pfd[0], 0);
@@ -1199,10 +1193,9 @@ void shell(void){
       free(input);
   }
 
+  freeJobStack(jobStack);
   if(jobStack != NULL)
     free(jobStack);
-  // TODO: free jobStack nodes
-  // freeJobStack();
 
   if(fgProc != NULL)
     free(fgProc);
