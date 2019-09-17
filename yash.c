@@ -214,7 +214,15 @@ int findID(JobNode_t** head, int id){
 }
 
 /**
- * TODO: WRITE HEADER
+ * Purpose:
+ *   Chack if pgid is in job stack
+ * 
+ * Args:
+ *   head (JobNode_t**): Pointer to job stack head pointer
+ *   id           (int): PGID of desired process
+ * 
+ * Returns:
+ *   (int): 1 (true) if in stack, else 0 (false)
  */ 
 int isInFG(JobNode_t** head, int id){
   const int IN_FG = 1;
@@ -375,7 +383,7 @@ void printDoneJobs(JobNode_t** head){
 
 /**
  * Purpose:
- *   Print stack of background jobs
+ *   Print stack of jobs
  * 
  * Args:
  *   head (JobNode_t**): Pointer to job stack head pointer
@@ -719,8 +727,7 @@ static void sigchldHandler(int sigNum){
       existsInStack = findID(jobStack, waitRet);
 	    if(existsInStack){
         changeJobStatus(jobStack, waitRet, DONE);
-        if(isInFG(jobStack, waitRet))
-          removeJob(jobStack, waitRet);
+        removeJob(jobStack, waitRet);
       }
     }
     else if (WIFSIGNALED(status)) {
@@ -1141,7 +1148,6 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
 void runForeground(JobNode_t** head){
   int recentPGID;
   Job_t* recent = findRecentBG(head);
-  sigset_t set;
   printf("FG run!\n");
 
   if(recent != NULL){
@@ -1151,16 +1157,47 @@ void runForeground(JobNode_t** head){
     removeJob(head, recentPGID);
     kill(-recentPGID, SIGCONT);
 
-    tcsetpgrp(0, recentPGID);
-    tcsetpgrp(1, recentPGID);
+    // tcsetpgrp(0, recentPGID);
+    // tcsetpgrp(1, recentPGID);
     // wait for signal
     int status;
     waitpid(-1, &status, WCONTINUED | WUNTRACED);
     waitpid(-1, &status, WCONTINUED | WUNTRACED);
-    tcsetpgrp(0, getpid());
-    tcsetpgrp(1, getpid());
+    // tcsetpgrp(0, getpid());
+    // tcsetpgrp(1, getpid());
   }
 	return;
+}
+
+/**
+ * Purpose:
+ *   Print out background string
+ * 
+ * Args:
+ *   head (JobNode_t**): Pointer to stack head pointer
+ *   pgid         (int): PGID of desired job
+ * 
+ * Returns:
+ *   None
+ */
+void printBGStr(JobNode_t** head, int pgid){
+  const char CURRENT = '+';
+  const char* BG_TOK = " &";
+
+  JobNode_t* curr = *head;
+  Job_t* currJob = NULL;
+
+  while(curr != NULL){
+    currJob = curr->job;
+    if(currJob->pgid == pgid){
+      strcat(currJob->jobStr, BG_TOK);
+      printf("[%d]%c %s\n", currJob->jobId, CURRENT, currJob->jobStr);
+      return;
+    }
+    curr = curr->next;
+  }
+
+  return;
 }
 
 /**
@@ -1174,24 +1211,23 @@ void runForeground(JobNode_t** head){
  *   None
  */ 
 void runBackground(JobNode_t** head){
+  const int IN_BG = 0;
   const int INVALID = -1;
   const int RUNNING = 0;
-  const char CURRENT = '+';
-  const char* BG_TOK = " &";
+  int recentPGID;
 
   Job_t* recent = findRecentStopped(head);
-  int recentPGID = recent->pgid;
-  int recentJobID = recent->jobId;
-  char* recentStr = NULL;
-  strcpy(recentStr, recent->jobStr);
-
-  if(recentPGID != INVALID){
-    killpg(recentPGID, SIGCONT);
-    changeJobStatus(head, recentPGID, RUNNING);
-    strcat(recentStr, BG_TOK);
-    printf("[%d]%c %s\n", recentJobID, CURRENT, recentStr);
+  if(recent != NULL){
+    recentPGID = recent->pgid;
   }
 
+  if(recentPGID != INVALID){
+    printBGStr(head, recentPGID);
+    changeJobStatus(head, recentPGID, RUNNING);
+    changeJobFGState(head, recentPGID, IN_BG);
+    killpg(recentPGID, SIGCONT);
+  }
+  
 	return;
 }
 
