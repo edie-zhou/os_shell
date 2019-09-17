@@ -540,17 +540,16 @@ void removeJob(JobNode_t** head, int pgid){
     return;
   }
   else if(curr->job->pgid == pgid){
-    curr = curr->next;
-    temp = curr;
+    (*head) = curr->next;
 
-    currJob = temp->job;
+    currJob = curr->job;
     if(currJob != NULL){
       if((currJob->jobStr) != NULL)
         free(currJob->jobStr);
       free(currJob);
     }
-    if(temp != NULL)
-      free(temp);
+    if(curr != NULL)
+      free(curr);
 
     return;
   }
