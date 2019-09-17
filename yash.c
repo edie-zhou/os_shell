@@ -13,9 +13,6 @@
 // Directions here:
 // https://docs.google.com/document/d/1LBMJslvYvw59uZ_8DNiiPzsp0heW3qesaalOo31IGYg/edit
 
-// TODO: # cat < temp.txt > output.txt 2> error.txt produces seg fault
-// ERROR: free(): invalid next size (fast)
-
 // TODO: Refactor into several .c and .h files, separating read, parse, and
 //       execute would be a good place to start
 
@@ -249,7 +246,7 @@ void printJobStr(JobNode_t** head, int id){
   
   while(curr != NULL){
     if(curr->pgid == id){
-      printf("%s\n", curr->jobStr);
+      printf("%s %d\n", curr->jobStr, curr->pgid);
     }
     curr = curr->next;
   }
@@ -294,16 +291,16 @@ void printStack(JobNode_t** head){
     }
 
     if(curr->status == RUN_VAL){
-      printf("[%d]%c  %s         %s \n", curr->jobId, currentJob, RUN_TXT,
-           curr->jobStr);
+      printf("[%d]%c  %s         %s %d\n", curr->jobId, currentJob, RUN_TXT,
+           curr->jobStr, curr->pgid);
     }
     else if(curr->status == STOPPED_VAL){
-      printf("[%d]%c  %s         %s \n", curr->jobId, currentJob, STOP_TXT,
-           curr->jobStr);
+      printf("[%d]%c  %s         %s %d\n", curr->jobId, currentJob, STOP_TXT,
+           curr->jobStr, curr->pgid);
     }
     else if(curr->status == DONE_VAL){
-      printf("[%d]%c  %s            %s \n", curr->jobId, currentJob, DONE_TXT,
-           curr->jobStr);
+      printf("[%d]%c  %s            %s %d\n", curr->jobId, currentJob, DONE_TXT,
+           curr->jobStr, curr->pgid);
     }
     curr = curr->next;
   }
@@ -887,8 +884,6 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
  *   None
  */ 
 void runForeground(JobNode_t** head){
-  // TODO: Running fg on non background (&) jobs doesn't stop terminal
-  // tcsetpgrp() may be the solution
   const int NOT_FOUND = -1;
 
   int notStoppedOnly = 0;
@@ -899,7 +894,7 @@ void runForeground(JobNode_t** head){
     removeJob(head, recent);
     kill(recent, SIGCONT);
     
-    waitpid(recent, NULL, WCONTINUED | WUNTRACED);
+    waitpid(recent, NULL, WUNTRACED);
   }
 
 	return;
