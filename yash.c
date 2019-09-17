@@ -104,6 +104,7 @@ void popStr(StrNode_t** head){
 void pushNode(JobNode_t** head, char* jobStr, int pgid, int status){
   JobNode_t* curr = (JobNode_t*)malloc(sizeof(JobNode_t));
 
+  pgrp = -1;
   curr->jobStr = (char*)malloc(2001 * sizeof(char));
   strcpy(curr->jobStr, jobStr);
   curr->pgid = pgid;
@@ -247,7 +248,7 @@ void checkDoneJobs(JobNode_t** head){
   JobNode_t* curr = *head;
 
   while(curr != NULL){
-    jobPGID = waitpid(curr->pgid, NULL, WNOHANG);
+    jobPGID = waitpid(-(curr->pgid), NULL, WNOHANG);
     if(jobPGID == curr->pgid){
       curr->status = DONE_VAL;
     }
@@ -576,9 +577,11 @@ void removeDoneJobs(JobNode_t** head){
  *   None
  */
 static void sigintHandler(int sigNum){
+  const int INVALID = -1;
   const char* PROMPT = "# ";
 
-	if(pgrp != -1){
+  printf("SIGINT: %d\n", pgrp);
+	if((pgrp != INVALID) && !findID(jobStack, pgrp)){
     killpg(pgrp, SIGINT);
 	}
   printf("\n%s", PROMPT);
@@ -605,7 +608,8 @@ static void sigtstpHandler(int sigNum){
   const char* PROMPT = "# ";
 
 	if((pgrp != -1) && !findID(jobStack, pgrp)){
-    killpg(pgrp, SIGTSTP);
+    killpg(pgrp, SIGSTOP);
+    printf("SIGTSTP killed: %d\n", pgrp);
     pushNode(jobStack, fgProc, pgrp, STOPPED);
 	}
   else{
@@ -627,7 +631,7 @@ static void sigtstpHandler(int sigNum){
  *   None
  */
 static void sigchldHandler(int sigNum){
-  // printf("\nSIGCHLD EXECUTED\n");
+printf("\nCHILD'S DEAD\n");
   signal(SIGCHLD, sigchldHandler);
 }
 
@@ -683,8 +687,6 @@ int checkInput(char* input){
   // TODO: Add function to ensure file redir goes to a file e.g.:# cat hello.txt >
   // TODO: Add function to ensure pipe goes to a valid command e.g.:# ls |
   // TODO: Add input verification to ensure that bg, fg, & are at expected indices
-  
-
   const int MAX_LINE_LEN = 2001;
   const int MAX_TOKEN_LEN = 31;
   const int INVALID = 0;
@@ -736,7 +738,6 @@ char** splitStrArray(char* input, const char* delim){
 
   char* token = strtok(inputCopy, delim);
   char* entry = (char*)malloc(allocSize * sizeof(char));
-  printf("%p\n", entry);
   strcpy(entry, token);
 
   while(token != NULL){
@@ -748,7 +749,6 @@ char** splitStrArray(char* input, const char* delim){
     if(token != NULL){
       entry = (char*)malloc(allocSize * sizeof(char));
       strcpy(entry, token);
-      printf("%p\n", entry);
     }
   }
 
@@ -777,7 +777,6 @@ char** splitStrArray(char* input, const char* delim){
  *   None  
  */ 
 void changeRedirToks(char** cmd, int* inIndex, int* outIndex, int* errIndex){
-  // TODO: fix mem leak here
   const char* IN_REDIR = "<";
   const char* OUT_REDIR = ">";
   const char* ERR_REDIR = "2>";
@@ -887,11 +886,13 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
     redirectFile(cmd);
     execvp(cmd[0], cmd);
 
+    printf("\nEXEC PGID: %d\n", getpgid(0));
     exit(EXIT_FAILURE);
   }
 
   // parent process
   pgrp = pidCh1;
+  printf("EXEC PID: %d\n", pidCh1);
   if(fgProc != NULL)
     free(fgProc);
 
@@ -899,7 +900,7 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
   strcpy(fgProc, input);
   if(!back){
     // If not background proc, wait to execution completion
-    waitpid(pidCh1, &status, WCONTINUED | WUNTRACED);
+    waitpid(pidCh1, &status, WUNTRACED);
   }
   else{
     // Add background job to stack
@@ -997,23 +998,25 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
 void runForeground(JobNode_t** head){
   const int NOT_FOUND = -1;
 
+  int status;
   int notStoppedOnly = 0;
   int recent = findRecent(head, notStoppedOnly);
 
   if(recent != NOT_FOUND){
+    pgrp = recent;
+    printf("FG: %d\n", recent);
     printJobStr(head, recent);
     removeJob(head, recent);
-    kill(recent, SIGCONT);
-    
-    waitpid(recent, NULL, WUNTRACED);
-  }
+    killpg(recent, SIGCONT);
+    waitpid(-recent, &status, WUNTRACED);
 
+  }
 	return;
 }
 
 /**
  * Purpose:
- *   Send SIGCONT to most recent job in job stack and run in foreground
+ *   Send SIGCONT to most recent job in job stack and run in background
  * 
  * Args:
  *   head (JobNode_t**): Pointer to stack head pointer
@@ -1030,7 +1033,7 @@ void runBackground(JobNode_t** head){
   int recent = findRecent(head, stoppedOnly);
 
   if(recent != INVALID){
-    kill(recent, SIGCONT);
+    killpg(recent, SIGCONT);
     changeJobStatus(head, recent, RUNNING);
     addBGTok(head, recent);
     printf("[%d]%c %s\n", (*jobStack)->jobId, CURRENT, (*jobStack)->jobStr);
