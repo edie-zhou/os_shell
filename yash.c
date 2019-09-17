@@ -16,6 +16,12 @@
 // TODO: Refactor into several .c and .h files, separating read, parse, and
 //       execute would be a good place to start
 
+typedef struct StrNode_t{
+  char* jobStr;
+
+  struct StrNode_t* next;
+} StrNode_t;
+
 /**
  * JobNode_t struct
  */ 
@@ -31,6 +37,56 @@ typedef struct JobNode_t{
 JobNode_t** jobStack = NULL;
 int pgrp = -1;
 char* fgProc;
+
+/**
+ * Purpose:
+ *   Push string node on to string stack
+ * 
+ * Args:
+ *   head (StrNode_t**): Pointer to string stack head pointer
+ * 
+ * Returns:
+ *   None 
+ */ 
+void pushStr(StrNode_t** head, char* str){
+  StrNode_t* curr = (StrNode_t*)malloc(sizeof(StrNode_t));
+
+  curr->jobStr = (char*)malloc(2001 * sizeof(char));
+  strcpy(curr->jobStr, str);
+
+  curr->next = (*head);
+  (*head) = curr;
+  
+  return;
+}
+
+/**
+ * Purpose:
+ *   Print string and pop node off of stack
+ * 
+ * Args:
+ *   head (StrNode_t**): Pointer to string stack head pointer
+ * 
+ * Returns:
+ *   None
+ */
+void popStr(StrNode_t** head){
+  StrNode_t* temp;
+
+  if((*head) == NULL){
+    return;
+  }
+
+  temp = (*head)->next;
+  if((*head)->jobStr != NULL){
+    printf("%s", (*head)->jobStr);
+    free((*head)->jobStr);
+  }
+  free(*head);
+  (*head) = temp;
+
+  return;
+}
 
 /**
  * Purpose:
@@ -277,6 +333,7 @@ void printJobStr(JobNode_t** head, int id){
  */
 void printStack(JobNode_t** head){
   // TODO: Reverse stack print order
+  const int MAX_PRINT_LEN = 2023;
   const int RUN_VAL = 0;
   const int STOPPED_VAL = 1;
   const int DONE_VAL = 2;
@@ -285,11 +342,19 @@ void printStack(JobNode_t** head){
   const char* RUN_TXT = "Running";
   const char* STOP_TXT = "Stopped";
   const char* DONE_TXT = "Done";
-
-  char currentJob;
+  const char* OTHR_FMT = "[%d]%c  %s         %s\n";
+  const char* DONE_FMT = "[%d]%c  %s            %s\n";
+  
   int currentID;
+  char currentJob;
+  char* strEntry;
+
+  StrNode_t** strHead = (StrNode_t**)malloc(sizeof(StrNode_t*));
+  *strHead = NULL;
   
   JobNode_t* curr = *head;
+  
+
   if(curr != NULL){
     currentID = curr->jobId;
   }
@@ -303,19 +368,34 @@ void printStack(JobNode_t** head){
     }
 
     if(curr->status == RUN_VAL){
-      printf("[%d]%c  %s         %s\n", curr->jobId, currentJob, RUN_TXT,
+      strEntry = (char*)malloc(MAX_PRINT_LEN * sizeof(char));
+      sprintf(strEntry, OTHR_FMT, curr->jobId, currentJob, RUN_TXT,
            curr->jobStr);
+      pushStr(strHead, strEntry);
+      free(strEntry);
     }
     else if(curr->status == STOPPED_VAL){
-      printf("[%d]%c  %s         %s\n", curr->jobId, currentJob, STOP_TXT,
+      strEntry = (char*)malloc(MAX_PRINT_LEN * sizeof(char));
+      sprintf(strEntry, OTHR_FMT, curr->jobId, currentJob, STOP_TXT,
            curr->jobStr);
+      pushStr(strHead, strEntry);
+      free(strEntry);
     }
     else if(curr->status == DONE_VAL){
-      printf("[%d]%c  %s            %s\n", curr->jobId, currentJob, DONE_TXT,
+      strEntry = (char*)malloc(MAX_PRINT_LEN * sizeof(char));
+      sprintf(strEntry, DONE_FMT, curr->jobId, currentJob, DONE_TXT,
            curr->jobStr);
+      pushStr(strHead, strEntry);
+      free(strEntry);
     }
     curr = curr->next;
   }
+
+  while((*strHead) != NULL){
+    popStr(strHead);
+  }
+  free(strHead);
+
   return;
 }
 
@@ -683,6 +763,7 @@ char** splitStrArray(char* input, const char* delim){
  *   None  
  */ 
 void changeRedirToks(char** cmd, int* inIndex, int* outIndex, int* errIndex){
+  // TODO: fix mem leak here
   const char* IN_REDIR = "<";
   const char* OUT_REDIR = ">";
   const char* ERR_REDIR = "2>";
