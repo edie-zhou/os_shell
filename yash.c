@@ -215,6 +215,25 @@ int findID(JobNode_t** head, int id){
 }
 
 /**
+ * TODO: WRITE HEADER
+ */ 
+int isInFG(JobNode_t** head, int id){
+  const int IN_FG = 1;
+  JobNode_t* curr = *head;
+  Job_t* currJob = NULL;
+  
+  while(curr != NULL){
+    currJob = curr->job;
+    if(currJob->inFG == IN_FG){
+      return 1;
+    }
+    curr = curr->next;
+  }
+
+  return 0;
+}
+
+/**
  * Purpose:
  *   Find most recent job that is in background
  * 
@@ -224,7 +243,7 @@ int findID(JobNode_t** head, int id){
  * Returns:
  *   (Job_t*): Pointer to most recent background job
  */ 
-Job_t* findRecent(JobNode_t** head){
+Job_t* findRecentBG(JobNode_t** head){
   const int DONE_VAL = 2;
 
   JobNode_t* curr = *head;
@@ -283,7 +302,9 @@ Job_t* findFGProc(JobNode_t** head){
   Job_t* currJob = NULL;
 
   while(curr != NULL){
+
     currJob = curr->job;
+    printf("findFGProc: %d\n", currJob->inFG);
     if(currJob->inFG){
       return currJob;
     }
@@ -465,6 +486,35 @@ void changeJobStatus(JobNode_t** head, int pgid, int newStat){
 
 /**
  * Purpose:
+ *   Change running status of job in job stack
+ * 
+ * Args:
+ *   head   (JobNode_t**): Pointer to job stack head pointer
+ *   pgid           (int): Process group ID
+ *   newStat        (int): New FG running status of process
+ * 
+ * Returns:
+ *   None
+ */ 
+void changeJobFGState(JobNode_t** head, int pgid, int newFGStat){
+  JobNode_t* temp = *head;
+  Job_t* currJob = NULL;
+
+  while(temp != NULL){
+    currJob = temp->job;
+    if(currJob->pgid == pgid){
+      currJob->inFG = newFGStat;
+
+      return;
+    }
+    temp = temp->next;
+  }
+
+  return;
+}
+
+/**
+ * Purpose:
  *   Remove job by pid from job stack
  * 
  * Args:
@@ -626,6 +676,7 @@ static void sigintHandler(int sigNum){
  */
 static void sigtstpHandler(int sigNum){
   // TODO: Fix Ctrl+Z double prompt print bug
+  const int IN_BG = 0;
   const char* PROMPT = "# ";
   Job_t* fgJob = findFGProc(jobStack);
   printf("TSTP Handler run!\n");
@@ -633,6 +684,7 @@ static void sigtstpHandler(int sigNum){
 	if(fgJob != NULL){
     pgrp = fgJob->pgid;
     printf("SIGTSTP: %d\n", pgrp);
+    changeJobFGState(jobStack, pgrp, IN_BG);
     kill(-pgrp, SIGTSTP);
 	}
   else{
@@ -661,15 +713,16 @@ static void sigchldHandler(int sigNum){
   int waitRet;
   int existsInStack = 0;
 
-  printf("SIGCHLD on pgrp: %d\n", pgrp);
   while ((waitRet = waitpid(-1, &status, WNOHANG | WUNTRACED)) > 0) {
     // Reaping function
     if (WIFEXITED(status)){
       // Child exited normally
       existsInStack = findID(jobStack, waitRet);
-	    if(existsInStack)
+	    if(existsInStack){
         changeJobStatus(jobStack, waitRet, DONE);
-
+        if(isInFG(jobStack, waitRet))
+          removeJob(jobStack, waitRet);
+      }
     }
     else if (WIFSIGNALED(status)) {
       // Child killed by signal
@@ -685,7 +738,7 @@ static void sigchldHandler(int sigNum){
       else
         changeJobStatus(jobStack, waitRet, STOPPED);
     }
-    printf("%d, ", waitRet);
+    printf("SIGCHLD on pgrp: %d\n", pgrp);
   }
 
   signal(SIGCHLD, sigchldHandler);
@@ -932,7 +985,7 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
   const int IN_BG = 0;
 
   sigset_t set;
-  
+
   int pidCh1 = fork();
 
   if(pidCh1 < 0){
@@ -967,15 +1020,10 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
   fgProc = (char*)malloc(MAX_LINE_LEN * sizeof(char));
   strcpy(fgProc, input);
   if(!back){
-    // If not background proc, wait to execution completion
-    // printf("WAITPID 2 TRIPPED\n");
-    // waitpid(-pidCh1, &status, WUNTRACED);
-    // if(WIFSTOPPED(status)){
-    //   printf("Stopped by signal (WIFSTOPPED tripped)\n");
-    // }
-    // sigemptyset(&mask); //Empty the mask2 to be used as a parameter in sigsuspend
     pushNode(head, input, pidCh1, RUNNING, IN_FG);
-    sigsuspend(&set); //Wait for a signal 
+
+    // wait for signal
+    sigsuspend(&set);
     return;
   }
   else{
@@ -1095,8 +1143,10 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
  *   None
  */ 
 void runForeground(JobNode_t** head){
-  Job_t* recent = findRecent(head);
   int recentPGID;
+  Job_t* recent = findRecentBG(head);
+  sigset_t set;
+  printf("FG run!\n");
 
   if(recent != NULL){
     recentPGID = recent->pgid;
@@ -1104,6 +1154,9 @@ void runForeground(JobNode_t** head){
     printf("FG: %d\n", recentPGID);
     removeJob(head, recentPGID);
     kill(-recentPGID, SIGCONT);
+
+    // wait for signal
+    sigsuspend(&set);
   }
 	return;
 }
