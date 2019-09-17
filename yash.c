@@ -1121,7 +1121,7 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
   }
   else{
     // Add background job to stack
-    pushNode(head, input, pgrp, RUNNING, IN_BG);
+    pushNode(head, input, pidCh1, RUNNING, IN_BG);
   }
 }
 
