@@ -628,10 +628,11 @@ static void sigtstpHandler(int sigNum){
   // TODO: Fix Ctrl+Z double prompt print bug
   const char* PROMPT = "# ";
   Job_t* fgJob = findFGProc(jobStack);
+  printf("TSTP Handler run!\n");
 
 	if(fgJob != NULL){
     pgrp = fgJob->pgid;
-    printf("SIGINT: %d\n", pgrp);
+    printf("SIGTSTP: %d\n", pgrp);
     kill(-pgrp, SIGTSTP);
 	}
   else{
@@ -653,8 +654,6 @@ static void sigtstpHandler(int sigNum){
  *   None
  */
 static void sigchldHandler(int sigNum){
-
-  printf("SIGCHLD on pgrp: %d\n", pgrp);
   const int STOPPED = 1;
   const int DONE = 2;
   const int IN_BG = 0;
@@ -662,6 +661,7 @@ static void sigchldHandler(int sigNum){
   int waitRet;
   int existsInStack = 0;
 
+  printf("SIGCHLD on pgrp: %d\n", pgrp);
   while ((waitRet = waitpid(-1, &status, WNOHANG | WUNTRACED)) > 0) {
     // Reaping function
     if (WIFEXITED(status)){
@@ -678,6 +678,7 @@ static void sigchldHandler(int sigNum){
         removeJob(jobStack, waitRet);
     }
     else if (WIFSTOPPED(status)) {
+      // Child stopped by signal
       existsInStack = findID(jobStack, waitRet);
       if(!existsInStack)
         pushNode(jobStack, fgProc, waitRet, STOPPED, IN_BG);
@@ -930,7 +931,7 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
   const int IN_FG = 1;
   const int IN_BG = 0;
 
-  int mask;
+  sigset_t set;
   int pidCh1 = fork();
 
   if(pidCh1 < 0){
@@ -973,7 +974,7 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
     // }
     // sigemptyset(&mask); //Empty the mask2 to be used as a parameter in sigsuspend
     pushNode(head, input, pidCh1, RUNNING, IN_FG);
-    sigsuspend(&mask); //Wait for a signal 
+    sigsuspend(&set); //Wait for a signal 
     return;
   }
   else{
@@ -1094,9 +1095,10 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
  */ 
 void runForeground(JobNode_t** head){
   Job_t* recent = findRecent(head);
-  int recentPGID = recent->pgid;
+  int recentPGID;
 
   if(recent != NULL){
+    recentPGID = recent->pgid;
     printf("%s\n", recent->jobStr);
     printf("FG: %d\n", recentPGID);
     removeJob(head, recentPGID);
