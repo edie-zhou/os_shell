@@ -267,15 +267,21 @@ void checkDoneJobs(JobNode_t** head){
  *   None
  */
 void printDoneJobs(JobNode_t** head){
+  const int MAX_PRINT_LEN = 2032;
   const int DONE_VAL = 2;
   const char CURRENT = '+';
   const char BACK = '-';
   const char* DONE_TXT = "Done";
+  const char* FORMAT = "[%d]%c  %s            %s\n";
 
-  char currentJob;
   int currentJobID;
+  char currentJob;
+  char* strEntry = NULL;
   
   JobNode_t* curr = *head;
+  StrNode_t** strHead = (StrNode_t**)malloc(sizeof(StrNode_t*));
+  *strHead = NULL;
+
   if(curr != NULL){
     currentJobID = curr->jobId;
   }
@@ -289,12 +295,21 @@ void printDoneJobs(JobNode_t** head){
     }
 
     if(curr->status == DONE_VAL){
-      printf("[%d]%c  %s            %s\n", curr->jobId, currentJob, DONE_TXT,
+      strEntry = (char*)malloc(MAX_PRINT_LEN * sizeof(char));
+      sprintf(strEntry, FORMAT, curr->jobId, currentJob, DONE_TXT,
              curr->jobStr);
+      pushStr(strHead, strEntry);
+      free(strEntry);
     }
 
     curr = curr->next;
   }
+
+  while((*strHead) != NULL){
+    popStr(strHead);
+  }
+  free(strHead);
+
   return;
 }
 
@@ -332,7 +347,6 @@ void printJobStr(JobNode_t** head, int id){
  *   None
  */
 void printStack(JobNode_t** head){
-  // TODO: Reverse stack print order
   const int MAX_PRINT_LEN = 2023;
   const int RUN_VAL = 0;
   const int STOPPED_VAL = 1;
@@ -349,12 +363,10 @@ void printStack(JobNode_t** head){
   char currentJob;
   char* strEntry;
 
+  JobNode_t* curr = *head;
   StrNode_t** strHead = (StrNode_t**)malloc(sizeof(StrNode_t*));
   *strHead = NULL;
   
-  JobNode_t* curr = *head;
-  
-
   if(curr != NULL){
     currentID = curr->jobId;
   }
@@ -724,6 +736,7 @@ char** splitStrArray(char* input, const char* delim){
 
   char* token = strtok(inputCopy, delim);
   char* entry = (char*)malloc(allocSize * sizeof(char));
+  printf("%p\n", entry);
   strcpy(entry, token);
 
   while(token != NULL){
@@ -735,6 +748,7 @@ char** splitStrArray(char* input, const char* delim){
     if(token != NULL){
       entry = (char*)malloc(allocSize * sizeof(char));
       strcpy(entry, token);
+      printf("%p\n", entry);
     }
   }
 
@@ -857,7 +871,6 @@ void redirectFile(char** cmd){
  */
 void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
   // TODO: Change execvp to execvpe
-  // TODO: Investigate WNOHANG waitpid flag
   const int MAX_LINE_LEN = 2001;
   const int RUNNING = 0;
 
@@ -870,7 +883,6 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
   }
   else if(pidCh1 == 0){
     // child (new process)
-
     setpgid(0,0);
     redirectFile(cmd);
     execvp(cmd[0], cmd);
@@ -927,7 +939,6 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
   }
   else if(pidCh1 == 0){
     // child 1 (new process)
-
     setpgid(0,0);
     dup2(pfd[1], 1);
     close(pfd[0]);
@@ -950,8 +961,6 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
   }
   else if(pidCh2 == 0){
     // child 2 (new process)
-    // TODO: Find out if these handlers are needed
-    
     setpgid(0, pidCh1);
     dup2(pfd[0], 0);
     close(pfd[1]);
@@ -1013,7 +1022,6 @@ void runForeground(JobNode_t** head){
  *   None
  */ 
 void runBackground(JobNode_t** head){
-  // TODO: Add & to end of jobStr when sending to bg
   const int INVALID = -1;
   const int RUNNING = 0;
   const char CURRENT = '+';
