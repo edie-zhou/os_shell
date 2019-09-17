@@ -1403,13 +1403,13 @@ void shell(void){
       printf("signal(SIGCHLD) error");
     } 
 
+    validInput = checkInput(input);
+    pgrp = -1;
+
     if((*jobStack) != NULL){
       printDoneJobs(jobStack);
       removeDoneJobs(jobStack);
     }
-
-    validInput = checkInput(input);
-    pgrp = -1;
     if(validInput){
       char** pipeArray = splitStrArray(input, PIPE);
       if(pipeArray[1] == NULL){
