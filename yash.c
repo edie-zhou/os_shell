@@ -999,16 +999,6 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
   }
   else if(pidCh1 == 0){
     // child (new process)
-    if(signal(SIGINT, sigintHandler) == SIG_ERR){
-      printf("signal(SIGINT) error");
-    }
-    if(signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
-      printf("signal(SIGTSTP) error");
-    } 
-    if(signal(SIGCHLD, sigchldHandler) == SIG_ERR){
-      printf("signal(SIGCHLD) error");
-    } 
-
     setpgid(0,0);
     redirectFile(cmd);
     execvp(cmd[0], cmd);
@@ -1071,16 +1061,6 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
   }
   else if(pidCh1 == 0){
     // child 1 (new process)
-    if(signal(SIGINT, sigintHandler) == SIG_ERR){
-      printf("signal(SIGINT) error");
-    }
-    if(signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
-      printf("signal(SIGTSTP) error");
-    } 
-    if(signal(SIGCHLD, sigchldHandler) == SIG_ERR){
-      printf("signal(SIGCHLD) error");
-    }
-   
     setpgid(0,0);
     dup2(pfd[1], 1);
     close(pfd[0]);
@@ -1101,18 +1081,7 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
     exit(EXIT_FAILURE);
   }
   else if(pidCh2 == 0){\
-
     // child 2 (new process)
-    if(signal(SIGINT, sigintHandler) == SIG_ERR){
-      printf("signal(SIGINT) error");
-    }
-    if(signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
-      printf("signal(SIGTSTP) error");
-    } 
-    if(signal(SIGCHLD, sigchldHandler) == SIG_ERR){
-      printf("signal(SIGCHLD) error");
-    } 
-
     setpgid(0, pidCh1);
     dup2(pfd[0], 0);
     close(pfd[1]);
@@ -1154,20 +1123,26 @@ void runForeground(JobNode_t** head){
   printf("FG run!\n");
 
   if(recent != NULL){
+    if(signal(SIGINT, sigintHandler) == SIG_ERR){
+      printf("signal(SIGINT) error");
+    }
+    if(signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
+      printf("signal(SIGTSTP) error");
+    } 
+    if(signal(SIGCHLD, sigchldHandler) == SIG_ERR){
+      printf("signal(SIGCHLD) error");
+    }
+
     recentPGID = recent->pgid;
     printf("%s\n", recent->jobStr);
     printf("FG: %d\n", recentPGID);
     removeJob(head, recentPGID);
     kill(-recentPGID, SIGCONT);
 
-    // tcsetpgrp(0, recentPGID);
-    // tcsetpgrp(1, recentPGID);
     // wait for signal
     int status;
     waitpid(-1, &status, WCONTINUED | WUNTRACED);
     waitpid(-1, &status, WCONTINUED | WUNTRACED);
-    // tcsetpgrp(0, getpid());
-    // tcsetpgrp(1, getpid());
   }
 	return;
 }
