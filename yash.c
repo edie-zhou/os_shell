@@ -19,8 +19,7 @@
 // TODO: Refactor into several .c and .h files, separating read, parse, and
 //       execute would be a good place to start
 
-// TODO: REFACTOR TO RELY SOLELY ON STACK, EVEN FOR FOREGROUND JOBS
-// THIS IS A BIG REFACTOR DO IT NOW, HOPEFULLY IT WILL HELP SOLVE SIGNAL BEHAVIOR
+// TODO: FG WON'T HANG ON TO TERMINAL
 
 typedef struct StrNode_t{
   char* jobStr;
@@ -1120,9 +1119,6 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
   close(pfd[1]);
   
   if(!back){
-    // // If not background proc, wait to execution completion
-    // printf("WAITPID 3 TRIPPED\n");
-    // waitpid(-pidCh1, &status, WUNTRACED);
     pushNode(head, input, pidCh1, RUNNING, IN_FG);
     return;
   }
@@ -1155,8 +1151,14 @@ void runForeground(JobNode_t** head){
     removeJob(head, recentPGID);
     kill(-recentPGID, SIGCONT);
 
+    tcsetpgrp(0, recentPGID);
+    tcsetpgrp(1, recentPGID);
     // wait for signal
-    sigsuspend(&set);
+    int status;
+    waitpid(-1, &status, WCONTINUED | WUNTRACED);
+    waitpid(-1, &status, WCONTINUED | WUNTRACED);
+    tcsetpgrp(0, getpid());
+    tcsetpgrp(1, getpid());
   }
 	return;
 }
