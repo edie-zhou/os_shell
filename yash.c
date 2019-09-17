@@ -221,7 +221,7 @@ void printDoneJobs(JobNode_t** head){
     }
 
     if(curr->status == DONE_VAL){
-      printf("[%d]%c  %s            %s \n", curr->jobId, currentJob, DONE_TXT,
+      printf("[%d]%c  %s            %s\n", curr->jobId, currentJob, DONE_TXT,
              curr->jobStr);
     }
 
@@ -246,7 +246,7 @@ void printJobStr(JobNode_t** head, int id){
   
   while(curr != NULL){
     if(curr->pgid == id){
-      printf("%s %d\n", curr->jobStr, curr->pgid);
+      printf("%s\n", curr->jobStr);
     }
     curr = curr->next;
   }
@@ -291,16 +291,16 @@ void printStack(JobNode_t** head){
     }
 
     if(curr->status == RUN_VAL){
-      printf("[%d]%c  %s         %s %d\n", curr->jobId, currentJob, RUN_TXT,
-           curr->jobStr, curr->pgid);
+      printf("[%d]%c  %s         %s\n", curr->jobId, currentJob, RUN_TXT,
+           curr->jobStr);
     }
     else if(curr->status == STOPPED_VAL){
-      printf("[%d]%c  %s         %s %d\n", curr->jobId, currentJob, STOP_TXT,
-           curr->jobStr, curr->pgid);
+      printf("[%d]%c  %s         %s\n", curr->jobId, currentJob, STOP_TXT,
+           curr->jobStr);
     }
     else if(curr->status == DONE_VAL){
-      printf("[%d]%c  %s            %s %d\n", curr->jobId, currentJob, DONE_TXT,
-           curr->jobStr, curr->pgid);
+      printf("[%d]%c  %s            %s\n", curr->jobId, currentJob, DONE_TXT,
+           curr->jobStr);
     }
     curr = curr->next;
   }
@@ -321,12 +321,39 @@ void printStack(JobNode_t** head){
  */ 
 void changeJobStatus(JobNode_t** head, int pgid, int newStatus){
   JobNode_t* temp = *head;
-  int changed = 0;
 
-  while((!changed)&&(temp != NULL)){
+  while(temp != NULL){
     if(temp->pgid == pgid){
-      changed = 1;
       temp->status = newStatus;
+
+      return;
+    }
+    temp = temp->next;
+  }
+
+  return;
+}
+
+/**
+ * Purpose:
+ *   Append background & token to jobStr
+ * 
+ * Args:
+ *   head (JobNode_t**): Pointer to job stack head pointer
+ *   pgid         (int): PGID of process to remove
+ * 
+ * Returns:
+ *   None
+ */
+void addBGTok(JobNode_t** head, int pgid){
+  const char* BG_TOK = " &";
+  JobNode_t* temp = *head;
+
+  while(temp != NULL){
+    if(temp->pgid == pgid){
+      strcat(temp->jobStr, BG_TOK);
+
+      return;
     }
     temp = temp->next;
   }
@@ -922,6 +949,7 @@ void runBackground(JobNode_t** head){
   if(recent != INVALID){
     kill(recent, SIGCONT);
     changeJobStatus(head, recent, RUNNING);
+    addBGTok(head, recent);
     printf("[%d]%c %s\n", (*jobStack)->jobId, CURRENT, (*jobStack)->jobStr);
   }
 
