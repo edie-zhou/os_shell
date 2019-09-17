@@ -356,16 +356,22 @@ void removeJob(JobNode_t** head, int pgid){
   }
   temp = curr->next;
   if(curr->pgid == pgid){
-    free(curr->jobStr);
-    free(curr);
+    if((curr->jobStr) != NULL)
+      free(curr->jobStr);
+    if(curr != NULL)
+      free(curr);
+
     *head = temp;
     return;
   }
   while(temp != NULL){
     if(temp->pgid == pgid){
       curr->next = temp->next;
-      free(temp->jobStr);
-      free(temp);
+      if(temp->jobStr != NULL)
+        free(temp->jobStr);
+      if(temp != NULL)
+        free(temp);
+
       return;
     }
     temp = temp->next;
@@ -390,8 +396,10 @@ void removeDoneJobs(JobNode_t** head){
   JobNode_t* temp = curr->next;
 
   while((curr != NULL) && (curr->status == DONE)){
-    free(curr->jobStr);
-    free(curr);
+    if((curr->jobStr) != NULL)
+      free(curr->jobStr);
+    if(curr != NULL)
+      free(curr);
 
     curr = temp;
     if(temp != NULL){
@@ -411,8 +419,11 @@ void removeDoneJobs(JobNode_t** head){
       if(temp->status == DONE){
         curr->next = temp->next;
 
-        free(temp->jobStr);
-        free(temp);
+        if(temp->jobStr != NULL)
+          free(temp->jobStr);
+        if(temp != NULL)
+          free(temp);
+
         temp = curr->next;
       }
       else{
@@ -578,15 +589,25 @@ int checkInput(char* input){
 char** splitStrArray(char* input, const char* delim){
   const int MAX_LINE_LEN = 2001;
   const int MAX_TOK_LEN = 31;
+  const char PIPE_CHAR = '|';
+  const char SPACE_CHAR = ' ';
+  int allocSize;
 
-  char* copy = (char*)malloc(MAX_LINE_LEN * sizeof(char));
-  strcpy(copy, input);
+  if(delim[0] == PIPE_CHAR){
+    allocSize = MAX_LINE_LEN;
+  }
+  else if(delim[0] == SPACE_CHAR){
+    allocSize = MAX_TOK_LEN;
+  }
+
+  char* inputCopy = (char*)malloc(MAX_LINE_LEN * sizeof(char));
+  strcpy(inputCopy, input);
   
   char** splitted = NULL;
   int numElements = 0;
 
-  char* token = strtok(copy, delim);
-  char* entry = (char*)malloc(MAX_TOK_LEN * sizeof(char));
+  char* token = strtok(inputCopy, delim);
+  char* entry = (char*)malloc(allocSize * sizeof(char));
   strcpy(entry, token);
 
   while(token != NULL){
@@ -596,7 +617,7 @@ char** splitStrArray(char* input, const char* delim){
 
     token = strtok(NULL, delim);
     if(token != NULL){
-      entry = (char*)malloc(MAX_TOK_LEN * sizeof(char));
+      entry = (char*)malloc(allocSize * sizeof(char));
       strcpy(entry, token);
     }
   }
@@ -606,7 +627,8 @@ char** splitStrArray(char* input, const char* delim){
   splitted = realloc(splitted, numElements * sizeof(char*));
   splitted[numElements - 1] = 0;
 
-  free(copy);
+  if(inputCopy != NULL)
+    free(inputCopy);
   return splitted;
 }
 
@@ -747,7 +769,9 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
 
   // parent process
   pgrp = pidCh1;
-  free(fgProc);
+  if(fgProc != NULL)
+    free(fgProc);
+
   fgProc = (char*)malloc(MAX_LINE_LEN * sizeof(char));
   strcpy(fgProc, input);
   if(!back){
@@ -809,7 +833,9 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
   }
 
   pgrp = pidCh1;
-  free(fgProc);
+  if(fgProc != NULL)
+    free(fgProc);
+
   fgProc = (char*)malloc(MAX_LINE_LEN * sizeof(char));
   strcpy(fgProc, input);
   pidCh2 = fork();
@@ -1100,13 +1126,16 @@ void shell(void){
         manageJobs(cmd, input, jobStack);
 
         index = 0;
-        while(cmd[index] != NULL){
-          free(cmd[index]);
-          index++;
+        if(cmd != NULL){
+          while(cmd[index] != NULL){
+            free(cmd[index]);
+            index++;
+          }
+          free(cmd);
         }
-        free(cmd);
 
-        free(pipeArray[0]);
+        if(pipeArray[0] != NULL)
+          free(pipeArray[0]);
       }
       else{
         // pipe exists
@@ -1114,33 +1143,46 @@ void shell(void){
         char** cmd2 = splitStrArray(pipeArray[1], SPACE_CHAR);
 
         managePipeJobs(cmd1, cmd2, input, jobStack);
-
-        index = 0;
-        while(cmd1[index] != NULL){
-          free(cmd1[index]);
-          index++;
-        }
-        free(cmd1);
         
+        if(cmd1 != NULL){
+          index = 0;
+          while(cmd1[index] != NULL){
+            free(cmd1[index]);
+            index++;
+          }
+          free(cmd1);
+        }
+
+        if(cmd2 != NULL){
         index = 0;
         while(cmd2[index] != NULL){
           free(cmd2[index]);
           index++;
         }
         free(cmd2);
-        free(pipeArray[0]);
-        free(pipeArray[1]);
+        }
+
+        if(pipeArray[0] != NULL)
+          free(pipeArray[0]);
+        
+        if(pipeArray[1] != NULL)
+          free(pipeArray[1]);
       }
-      free(pipeArray);
+      if(pipeArray != NULL)
+        free(pipeArray);
     }
 
-    free(input);
+    if(input != NULL)
+      free(input);
   }
 
-  free(jobStack);
+  if(jobStack != NULL)
+    free(jobStack);
   // TODO: free jobStack nodes
   // freeJobStack();
-  free(fgProc);
+
+  if(fgProc != NULL)
+    free(fgProc);
 
   return;
 }
