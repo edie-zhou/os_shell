@@ -990,9 +990,8 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
   const int IN_FG = 1;
   const int IN_BG = 0;
 
-  sigset_t set;
-
   int pidCh1 = fork();
+  sigset_t set;
 
   if(pidCh1 < 0){
     // fork failed; exit
@@ -1062,6 +1061,7 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
   int pidCh1;
   int pidCh2;
   int pfd[2];
+  sigset_t set;
 
   pipe(pfd);
   pidCh1 = fork();
@@ -1127,6 +1127,9 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
   
   if(!back){
     pushNode(head, input, pidCh1, RUNNING, IN_FG);
+
+    // Wait for signal
+    sigsuspend(&set);
     return;
   }
   else{
