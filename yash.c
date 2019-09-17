@@ -10,11 +10,17 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
+// Used for debugging
+#include <errno.h>
+
 // Directions here:
 // https://docs.google.com/document/d/1LBMJslvYvw59uZ_8DNiiPzsp0heW3qesaalOo31IGYg/edit
 
 // TODO: Refactor into several .c and .h files, separating read, parse, and
 //       execute would be a good place to start
+
+// TODO: REFACTOR TO RELY SOLELY ON STACK, EVEN FOR FOREGROUND JOBS
+// THIS IS A BIG REFACTOR DO IT NOW, HOPEFULLY IT WILL HELP SOLVE SIGNAL BEHAVIOR
 
 typedef struct StrNode_t{
   char* jobStr;
@@ -29,6 +35,7 @@ typedef struct JobNode_t{
 	char* jobStr;
   int jobId;
   int pgid;
+  int fg;
   int status; // or enum
 
   struct JobNode_t* next;
@@ -36,6 +43,7 @@ typedef struct JobNode_t{
 
 JobNode_t** jobStack = NULL;
 int pgrp = -1;
+int busy = 0;
 char* fgProc;
 
 /**
@@ -97,11 +105,12 @@ void popStr(StrNode_t** head){
  *   jobStr      (char*): Job string
  *   pgid          (int): Process group id of job
  *   status        (int): Running state of job
+ *   fg            (int): Foreground status of job
  * 
  * Returns:
  *   None
  */ 
-void pushNode(JobNode_t** head, char* jobStr, int pgid, int status){
+void pushNode(JobNode_t** head, char* jobStr, int pgid, int status, int fg){
   JobNode_t* curr = (JobNode_t*)malloc(sizeof(JobNode_t));
 
   pgrp = -1;
@@ -115,6 +124,8 @@ void pushNode(JobNode_t** head, char* jobStr, int pgid, int status){
     curr->jobId = (*head)->jobId + 1;
   }  
   curr->status = status;
+  curr->fg = fg;
+
   curr->next = *head;
   *head = curr;
   return;
@@ -248,7 +259,8 @@ void checkDoneJobs(JobNode_t** head){
   JobNode_t* curr = *head;
 
   while(curr != NULL){
-    jobPGID = waitpid(-(curr->pgid), NULL, WNOHANG);
+    // printf("WAITPID 1 TRIPPED\n");
+    // jobPGID = waitpid(-(curr->pgid), NULL, WNOHANG);
     if(jobPGID == curr->pgid){
       curr->status = DONE_VAL;
     }
@@ -357,8 +369,8 @@ void printStack(JobNode_t** head){
   const char* RUN_TXT = "Running";
   const char* STOP_TXT = "Stopped";
   const char* DONE_TXT = "Done";
-  const char* OTHR_FMT = "[%d]%c  %s         %s\n";
-  const char* DONE_FMT = "[%d]%c  %s            %s\n";
+  const char* OTHR_FMT = "[%d]%c  %s         %s %d\n";
+  const char* DONE_FMT = "[%d]%c  %s            %s %d\n";
   
   int currentID;
   char currentJob;
@@ -383,21 +395,24 @@ void printStack(JobNode_t** head){
     if(curr->status == RUN_VAL){
       strEntry = (char*)malloc(MAX_PRINT_LEN * sizeof(char));
       sprintf(strEntry, OTHR_FMT, curr->jobId, currentJob, RUN_TXT,
-           curr->jobStr);
+           curr->jobStr, curr->pgid);
+
       pushStr(strHead, strEntry);
       free(strEntry);
     }
     else if(curr->status == STOPPED_VAL){
       strEntry = (char*)malloc(MAX_PRINT_LEN * sizeof(char));
       sprintf(strEntry, OTHR_FMT, curr->jobId, currentJob, STOP_TXT,
-           curr->jobStr);
+           curr->jobStr, curr->pgid);
+
       pushStr(strHead, strEntry);
       free(strEntry);
     }
     else if(curr->status == DONE_VAL){
       strEntry = (char*)malloc(MAX_PRINT_LEN * sizeof(char));
       sprintf(strEntry, DONE_FMT, curr->jobId, currentJob, DONE_TXT,
-           curr->jobStr);
+           curr->jobStr, curr->pgid);
+
       pushStr(strHead, strEntry);
       free(strEntry);
     }
@@ -604,13 +619,15 @@ static void sigintHandler(int sigNum){
  */
 static void sigtstpHandler(int sigNum){
   // TODO: Fix Ctrl+Z double prompt print bug
+  const int INVALID = -1;
   const int STOPPED = 1;
   const char* PROMPT = "# ";
 
-	if((pgrp != -1) && !findID(jobStack, pgrp)){
-    killpg(pgrp, SIGSTOP);
-    printf("SIGTSTP killed: %d\n", pgrp);
-    pushNode(jobStack, fgProc, pgrp, STOPPED);
+	if((pgrp != INVALID) && !findID(jobStack, pgrp)){
+    int pgRet = kill(-pgrp, SIGTSTP);
+    // printf("SIGTSTP killed: %d\n", pgrp);
+    // printf("PG RET: %d\n", pgRet);
+    // pushNode(jobStack, fgProc, pgrp, STOPPED);
 	}
   else{
     printf("\n%s", PROMPT);
@@ -631,7 +648,56 @@ static void sigtstpHandler(int sigNum){
  *   None
  */
 static void sigchldHandler(int sigNum){
-printf("\nCHILD'S DEAD\n");
+
+  printf("SIGCHLD on pgrp: %d\n", pgrp);
+  const int NOT_FOUND = -1;
+  const int STOPPED = 1;
+  const int DONE = 2;
+  const int NORMAL_RET = 0;
+  const int NOT_ONLY_STOP = 0;
+  int status;
+  int waitRet;
+  int existsInStack = 0;
+
+  while ((waitRet = waitpid(-1, &status, WNOHANG | WUNTRACED)) > 0) {
+    // Reaping function
+    if (WIFEXITED(status)){
+      // Child exited normally
+      existsInStack = findID(jobStack, waitRet);
+	    if(existsInStack)
+        changeJobStatus(jobStack, waitRet, DONE);
+
+    }
+    else if (WIFSIGNALED(status)) {
+      // Child killed by signal
+      existsInStack = findID(jobStack, waitRet);
+	    if(existsInStack)
+        removeJob(jobStack, waitRet);
+    }
+    else if (WIFSTOPPED(status)) {
+      existsInStack = findID(jobStack, waitRet);
+      if(!existsInStack)
+        pushNode(jobStack, fgProc, waitRet, STOPPED);
+      else
+        changeJobStatus(jobStack, waitRet, STOPPED);
+    }
+    printf("%d, ", waitRet);
+  }
+  // waitRet = waitpid(-1, &status, WUNTRACED);
+  // if(errno == ECHILD){
+  //   printf("ECHILD on pgrp: %d, does not exist\n", pgrp);
+  // }
+  // if(errno == EINTR){
+  //   printf("EINTR on pgrp: %d\n", pgrp);
+  // }
+  // if(errno == EINVAL){
+  //   printf("EINVAL on pgrp: %d\n", pgrp);
+  // }
+  // if(WIFEXITED(status)){
+  //   printf("Exited normally (WIFEXITED tripped)\n");
+  // }
+
+  busy = 0;
   signal(SIGCHLD, sigchldHandler);
 }
 
@@ -874,6 +940,7 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
   const int RUNNING = 0;
 
   int status;
+  int mask;
   int pidCh1 = fork();
 
   if(pidCh1 < 0){
@@ -882,6 +949,16 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
   }
   else if(pidCh1 == 0){
     // child (new process)
+    if(signal(SIGINT, sigintHandler) == SIG_ERR){
+      printf("signal(SIGINT) error");
+    }
+    if(signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
+      printf("signal(SIGTSTP) error");
+    } 
+    if(signal(SIGCHLD, sigchldHandler) == SIG_ERR){
+      printf("signal(SIGCHLD) error");
+    } 
+
     setpgid(0,0);
     redirectFile(cmd);
     execvp(cmd[0], cmd);
@@ -900,11 +977,19 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
   strcpy(fgProc, input);
   if(!back){
     // If not background proc, wait to execution completion
-    waitpid(pidCh1, &status, WUNTRACED);
+    // printf("WAITPID 2 TRIPPED\n");
+    // waitpid(-pidCh1, &status, WUNTRACED);
+    // if(WIFSTOPPED(status)){
+    //   printf("Stopped by signal (WIFSTOPPED tripped)\n");
+    // }
+    // sigemptyset(&mask); //Empty the mask2 to be used as a parameter in sigsuspend
+    sigsuspend(&mask); //Wait for a signal
+    return;
   }
   else{
     // Add background job to stack
     pushNode(head, input, pidCh1, RUNNING);
+    return;
   }
 }
 
@@ -928,8 +1013,7 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
 
   int pidCh1;
   int pidCh2;
-  int status1;
-  int status2;
+  int status;
   int pfd[2];
 
   pipe(pfd);
@@ -940,6 +1024,16 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
   }
   else if(pidCh1 == 0){
     // child 1 (new process)
+    if(signal(SIGINT, sigintHandler) == SIG_ERR){
+      printf("signal(SIGINT) error");
+    }
+    if(signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
+      printf("signal(SIGTSTP) error");
+    } 
+    if(signal(SIGCHLD, sigchldHandler) == SIG_ERR){
+      printf("signal(SIGCHLD) error");
+    }
+   
     setpgid(0,0);
     dup2(pfd[1], 1);
     close(pfd[0]);
@@ -960,8 +1054,19 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
     // fork failed; exit
     exit(EXIT_FAILURE);
   }
-  else if(pidCh2 == 0){
+  else if(pidCh2 == 0){\
+
     // child 2 (new process)
+    if(signal(SIGINT, sigintHandler) == SIG_ERR){
+      printf("signal(SIGINT) error");
+    }
+    if(signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
+      printf("signal(SIGTSTP) error");
+    } 
+    if(signal(SIGCHLD, sigchldHandler) == SIG_ERR){
+      printf("signal(SIGCHLD) error");
+    } 
+
     setpgid(0, pidCh1);
     dup2(pfd[0], 0);
     close(pfd[1]);
@@ -975,9 +1080,11 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
   close(pfd[1]);
   
   if(!back){
-    // If not background proc, wait to execution completion
-    waitpid(pidCh1, &status1, WCONTINUED | WUNTRACED);
-    waitpid(pidCh2, &status2, WCONTINUED | WUNTRACED);
+    // // If not background proc, wait to execution completion
+    // printf("WAITPID 3 TRIPPED\n");
+    // waitpid(-pidCh1, &status, WUNTRACED);
+    busy = 1;
+    return;
   }
   else{
     // Add background job to stack
@@ -1004,11 +1111,24 @@ void runForeground(JobNode_t** head){
 
   if(recent != NOT_FOUND){
     pgrp = recent;
-    printf("FG: %d\n", recent);
     printJobStr(head, recent);
+    printf("FG: %d\n", recent);
     removeJob(head, recent);
-    killpg(recent, SIGCONT);
-    waitpid(-recent, &status, WUNTRACED);
+    kill(-recent, SIGCONT);
+    // printf("WAITPID 4 TRIPPED\n");
+    // waitpid(-recent, &status, WUNTRACED);
+    // if(errno == ECHILD){
+    //   printf("ECHILD on pgrp: %d, does not exist\n", pgrp);
+    // }
+    // if(errno == EINTR){
+    //   printf("EINTR on pgrp: %d\n", pgrp);
+    // }
+    // if(errno == EINVAL){
+    //   printf("EINVAL on pgrp: %d\n", pgrp);
+    // }
+    // if(WIFEXITED(status)){
+    //   printf("Exited normally (WIFEXITED tripped)\n");
+    // }
 
   }
 	return;
@@ -1188,7 +1308,7 @@ void shell(void){
   const int MAX_LINE_LEN = 2001;
   const char* PIPE = "|";
   const char* SPACE_CHAR = " ";
-  const char* PROMPT = "# ";
+  const char* PROMPT = "PROMPT # ";
 
   int validInput = 0;
   int index = -1;
@@ -1207,6 +1327,9 @@ void shell(void){
   // Reset pgrp
   pgrp = -1;
   fgProc = (char*)malloc(MAX_LINE_LEN * sizeof(char));
+
+  while(busy){
+  }
 
   while(input = readline(PROMPT)){
     if(signal(SIGINT, sigintHandler) == SIG_ERR){
