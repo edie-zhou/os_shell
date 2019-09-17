@@ -29,14 +29,21 @@ typedef struct StrNode_t{
 } StrNode_t;
 
 /**
+ * Job struct
+ */
+typedef struct Job_t{
+  char* jobStr;
+  int jobId;
+  int pgid;
+  // int fg;
+  int status;
+}Job_t;
+
+/**
  * JobNode_t struct
  */ 
 typedef struct JobNode_t{
-	char* jobStr;
-  int jobId;
-  int pgid;
-  int fg;
-  int status; // or enum
+  Job_t* job;
 
   struct JobNode_t* next;
 }JobNode_t;
@@ -58,7 +65,7 @@ char* fgProc;
  */ 
 void pushStr(StrNode_t** head, char* str){
   StrNode_t* curr = (StrNode_t*)malloc(sizeof(StrNode_t));
-
+  
   curr->jobStr = (char*)malloc(2001 * sizeof(char));
   strcpy(curr->jobStr, str);
 
@@ -79,7 +86,7 @@ void pushStr(StrNode_t** head, char* str){
  *   None
  */
 void popStr(StrNode_t** head){
-  StrNode_t* temp;
+  StrNode_t* temp = NULL;
 
   if((*head) == NULL){
     return;
@@ -110,21 +117,23 @@ void popStr(StrNode_t** head){
  * Returns:
  *   None
  */ 
-void pushNode(JobNode_t** head, char* jobStr, int pgid, int status, int fg){
+void pushNode(JobNode_t** head, char* jobStr, int pgid, int status){
   JobNode_t* curr = (JobNode_t*)malloc(sizeof(JobNode_t));
-
+  Job_t* job = (Job_t*)malloc(sizeof(Job_t));
+  
   pgrp = -1;
-  curr->jobStr = (char*)malloc(2001 * sizeof(char));
-  strcpy(curr->jobStr, jobStr);
-  curr->pgid = pgid;
+  job->jobStr = (char*)malloc(2001 * sizeof(char));
+  strcpy(job->jobStr, jobStr);
+  job->pgid = pgid;
   if(*head == NULL){
-    curr->jobId = 1;
+    job->jobId = 1;
   }
   else{
-    curr->jobId = (*head)->jobId + 1;
+    job->jobId = (*head)->job->jobId + 1;
   }  
-  curr->status = status;
-  curr->fg = fg;
+  job->status = status;
+  // curr->job->fg = fg;
+  curr->job = job;
 
   curr->next = *head;
   *head = curr;
@@ -148,10 +157,12 @@ void freeJobStack(JobNode_t** head){
   while(curr != NULL){
     temp = curr;
     curr = curr->next;
-    if(temp->jobStr != NULL)
-      free(temp->jobStr);
+    if(temp->job != NULL){
+      if(temp->job->jobStr != NULL)
+        free(temp->job->jobStr);
+      free(temp->job);
+    }
     free(temp);
-    
   }
 
   return;
@@ -187,86 +198,75 @@ int countNodes(JobNode_t** head){
  *   id           (int): Process group ID to look for
  * 
  * Returns:
- *   (int): 1 if job is already in stack
+ *   (Job_t*): Job pointer of desired job
  */ 
 int findID(JobNode_t** head, int id){
-  const int FOUND = 1;
-  const int NOT_FOUND = 0;
-
   JobNode_t* curr = *head;
+  Job_t* currJob = NULL;
   
   while(curr != NULL){
-    if(curr->pgid == id){
-      return FOUND;
+    currJob = curr->job;
+    if(currJob->pgid == id){
+      return 1;
     }
     curr = curr->next;
   }
 
-  return NOT_FOUND;
+  return 0;
 }
 
 /**
  * Purpose:
- *   Find most recent job that is stopped or in background
- * 
- * Args:
- *   head       (JobNode_t**): Pointer to job stack head pointer
- *   findStopped        (int): if 1, only look for stopped jobs
- * 
- * Returns:
- *   (int): PGID of most recent stopped job
- */ 
-int findRecent(JobNode_t** head, int stoppedOnly){
-  const int STOPPED_VAL = 1;
-  const int DONE_VAL = 2;
-  const int NOT_FOUND = -1;
-
-  JobNode_t* curr = *head;
-  
-  if(stoppedOnly){
-    while(curr != NULL){
-      if(curr->status == STOPPED_VAL){
-        return curr->pgid;
-      }
-      curr = curr->next;
-    }
-  }
-  else{
-    while(curr != NULL){
-      if(curr->status != DONE_VAL){
-        return curr->pgid;
-      }
-      curr = curr->next;
-    }
-  }
-
-  return NOT_FOUND;
-}
-
-/**
- * Purpose:
- *   Change state of completed jobs in job stack
+ *   Find most recent job that is in background
  * 
  * Args:
  *   head (JobNode_t**): Pointer to job stack head pointer
  * 
  * Returns:
- *   None
- */
-void checkDoneJobs(JobNode_t** head){
+ *   (Job_t*): Pointer to most recent background job
+ */ 
+Job_t* findRecent(JobNode_t** head){
   const int DONE_VAL = 2;
-  int jobPGID;
-  JobNode_t* curr = *head;
 
+  JobNode_t* curr = *head;
+  Job_t* currJob = NULL;
+  
   while(curr != NULL){
-    // printf("WAITPID 1 TRIPPED\n");
-    // jobPGID = waitpid(-(curr->pgid), NULL, WNOHANG);
-    if(jobPGID == curr->pgid){
-      curr->status = DONE_VAL;
+    currJob = curr->job;
+    if(currJob->status != DONE_VAL){
+      return currJob;
     }
     curr = curr->next;
   }
-  return;
+
+  return NULL;
+}
+
+/**
+ * Purpose:
+ *   Find most recent stopped job
+ * 
+ * Args:
+ *   head (JobNode_t**): Pointer to job stack head pointer
+ * 
+ * Returns:
+ *   (Job_t*): Pointer to most recent stopped job
+ */ 
+Job_t* findRecentStopped(JobNode_t** head){
+  const int STOPPED_VAL = 1;
+
+  JobNode_t* curr = *head;
+  Job_t* currJob = NULL;
+
+  while(curr != NULL){
+    currJob = curr->job;
+    if(currJob->status == STOPPED_VAL){
+      return currJob;
+    }
+    curr = curr->next;
+  }
+
+  return NULL;
 }
 
 /**
@@ -292,25 +292,28 @@ void printDoneJobs(JobNode_t** head){
   char* strEntry = NULL;
   
   JobNode_t* curr = *head;
+  Job_t* currJob = NULL;
   StrNode_t** strHead = (StrNode_t**)malloc(sizeof(StrNode_t*));
   *strHead = NULL;
 
   if(curr != NULL){
-    currentJobID = curr->jobId;
+    currJob = curr->job;
+    currentJobID = currJob->jobId;
   }
 
   while(curr != NULL){
-    if(curr->jobId == currentJobID){
+    currJob = curr->job;
+    if(currJob->jobId == currentJobID){
       currentJob = CURRENT;
     }
     else{
       currentJob = BACK;
     }
 
-    if(curr->status == DONE_VAL){
+    if(currJob->status == DONE_VAL){
       strEntry = (char*)malloc(MAX_PRINT_LEN * sizeof(char));
-      sprintf(strEntry, FORMAT, curr->jobId, currentJob, DONE_TXT,
-             curr->jobStr);
+      sprintf(strEntry, FORMAT, currJob->jobId, currentJob, DONE_TXT,
+             currJob->jobStr);
       pushStr(strHead, strEntry);
       free(strEntry);
     }
@@ -323,29 +326,6 @@ void printDoneJobs(JobNode_t** head){
   }
   free(strHead);
 
-  return;
-}
-
-/**
- * Purpose: Print jobStr of job by pgid
- * 
- * Args:
- *   head (JobNode_t**): Pointer to job stack head pointer
- *   id           (int): PGID of job string to print
- * 
- * Returns:
- *   None
- */
-void printJobStr(JobNode_t** head, int id){
-
-  JobNode_t* curr = *head;
-  
-  while(curr != NULL){
-    if(curr->pgid == id){
-      printf("%s\n", curr->jobStr);
-    }
-    curr = curr->next;
-  }
   return;
 }
 
@@ -377,41 +357,44 @@ void printStack(JobNode_t** head){
   char* strEntry;
 
   JobNode_t* curr = *head;
+  Job_t* currJob = NULL;
   StrNode_t** strHead = (StrNode_t**)malloc(sizeof(StrNode_t*));
   *strHead = NULL;
   
   if(curr != NULL){
-    currentID = curr->jobId;
+    currJob = curr->job;
+    currentID = currJob->jobId;
   }
 
   while(curr != NULL){
-    if(curr->jobId == currentID){
+    currJob = curr->job;
+    if(currJob->jobId == currentID){
       currentJob = CURRENT;
     }
     else{
       currentJob = BACK;
     }
 
-    if(curr->status == RUN_VAL){
+    if(currJob->status == RUN_VAL){
       strEntry = (char*)malloc(MAX_PRINT_LEN * sizeof(char));
-      sprintf(strEntry, OTHR_FMT, curr->jobId, currentJob, RUN_TXT,
-           curr->jobStr, curr->pgid);
+      sprintf(strEntry, OTHR_FMT, currJob->jobId, currentJob, RUN_TXT,
+           currJob->jobStr, currJob->pgid);
 
       pushStr(strHead, strEntry);
       free(strEntry);
     }
-    else if(curr->status == STOPPED_VAL){
+    else if(currJob->status == STOPPED_VAL){
       strEntry = (char*)malloc(MAX_PRINT_LEN * sizeof(char));
-      sprintf(strEntry, OTHR_FMT, curr->jobId, currentJob, STOP_TXT,
-           curr->jobStr, curr->pgid);
+      sprintf(strEntry, OTHR_FMT, currJob->jobId, currentJob, STOP_TXT,
+           currJob->jobStr, currJob->pgid);
 
       pushStr(strHead, strEntry);
       free(strEntry);
     }
-    else if(curr->status == DONE_VAL){
+    else if(currJob->status == DONE_VAL){
       strEntry = (char*)malloc(MAX_PRINT_LEN * sizeof(char));
-      sprintf(strEntry, DONE_FMT, curr->jobId, currentJob, DONE_TXT,
-           curr->jobStr, curr->pgid);
+      sprintf(strEntry, DONE_FMT, currJob->jobId, currentJob, DONE_TXT,
+           currJob->jobStr, currJob->pgid);
 
       pushStr(strHead, strEntry);
       free(strEntry);
@@ -432,19 +415,21 @@ void printStack(JobNode_t** head){
  *   Change running status of job in job stack
  * 
  * Args:
- *   head (JobNode_t**): Pointer to job stack head pointer
- *   pgid         (int): Process group ID
- *   newStatus    (int): New running status of process
+ *   head   (JobNode_t**): Pointer to job stack head pointer
+ *   pgid           (int): Process group ID
+ *   newStat        (int): New running status of process
  * 
  * Returns:
  *   None
  */ 
-void changeJobStatus(JobNode_t** head, int pgid, int newStatus){
+void changeJobStatus(JobNode_t** head, int pgid, int newStat){
   JobNode_t* temp = *head;
+  Job_t* currJob = NULL;
 
   while(temp != NULL){
-    if(temp->pgid == pgid){
-      temp->status = newStatus;
+    currJob = temp->job;
+    if(currJob->pgid == pgid){
+      currJob->status = newStat;
 
       return;
     }
@@ -468,10 +453,12 @@ void changeJobStatus(JobNode_t** head, int pgid, int newStatus){
 void addBGTok(JobNode_t** head, int pgid){
   const char* BG_TOK = " &";
   JobNode_t* temp = *head;
+  Job_t* currJob = NULL;
 
   while(temp != NULL){
-    if(temp->pgid == pgid){
-      strcat(temp->jobStr, BG_TOK);
+    currJob = temp->job;
+    if(currJob->pgid == pgid){
+      strcat(currJob->jobStr, BG_TOK);
 
       return;
     }
@@ -495,13 +482,19 @@ void addBGTok(JobNode_t** head, int pgid){
 void removeJob(JobNode_t** head, int pgid){
   JobNode_t* curr = *head;
   JobNode_t* temp = NULL;
+  Job_t* currJob = NULL;
+
   if(curr == NULL){
     return;
   }
   temp = curr->next;
-  if(curr->pgid == pgid){
-    if((curr->jobStr) != NULL)
-      free(curr->jobStr);
+  currJob = curr->job;
+  if(currJob->pgid == pgid){
+    if(currJob != NULL){
+      if((currJob->jobStr) != NULL)
+        free(currJob->jobStr);
+      free(currJob);
+    }
     if(curr != NULL)
       free(curr);
 
@@ -509,10 +502,13 @@ void removeJob(JobNode_t** head, int pgid){
     return;
   }
   while(temp != NULL){
-    if(temp->pgid == pgid){
+    currJob = temp->job;
+    if(currJob->pgid == pgid){
       curr->next = temp->next;
-      if(temp->jobStr != NULL)
-        free(temp->jobStr);
+      if(currJob != NULL){
+        if(currJob->jobStr != NULL)
+          free(currJob->jobStr);
+      }
       if(temp != NULL)
         free(temp);
 
@@ -538,10 +534,20 @@ void removeDoneJobs(JobNode_t** head){
 
   JobNode_t* curr = *head;
   JobNode_t* temp = curr->next;
+  Job_t* currJob = NULL;
 
-  while((curr != NULL) && (curr->status == DONE)){
-    if((curr->jobStr) != NULL)
-      free(curr->jobStr);
+  
+  if(curr->job != NULL){
+    currJob = curr->job;
+  }
+
+  while((curr != NULL) && (currJob->status == DONE)){
+    currJob = curr->job;
+
+    if(currJob != NULL){
+      if((currJob->jobStr) != NULL)
+        free(currJob->jobStr);
+    }
     if(curr != NULL)
       free(curr);
 
@@ -550,9 +556,9 @@ void removeDoneJobs(JobNode_t** head){
       temp = temp->next;
     }
   }
-  if(curr == NULL){
-    *head = NULL;
 
+  if(curr == NULL){
+    // *head = NULL;
     return;
   }
   else{
@@ -560,11 +566,15 @@ void removeDoneJobs(JobNode_t** head){
     temp = curr->next;
 
     while(temp != NULL){
-      if(temp->status == DONE){
+      currJob = temp->job;
+      if(currJob->status == DONE){
         curr->next = temp->next;
 
-        if(temp->jobStr != NULL)
-          free(temp->jobStr);
+        if(currJob != NULL){
+          if(currJob->jobStr != NULL)
+            free(currJob->jobStr);
+          free(currJob);
+        }
         if(temp != NULL)
           free(temp);
 
@@ -1106,15 +1116,15 @@ void runForeground(JobNode_t** head){
   const int NOT_FOUND = -1;
 
   int status;
-  int notStoppedOnly = 0;
-  int recent = findRecent(head, notStoppedOnly);
+  Job_t* recent = findRecent(head);
+  int recentPGID = recent->pgid;
 
-  if(recent != NOT_FOUND){
+  if(recentPGID != NOT_FOUND){
     pgrp = recent;
-    printJobStr(head, recent);
-    printf("FG: %d\n", recent);
-    removeJob(head, recent);
-    kill(-recent, SIGCONT);
+    printf("%s\n", recent->jobStr);
+    printf("FG: %d\n", recentPGID);
+    removeJob(head, recentPGID);
+    kill(-recentPGID, SIGCONT);
     // printf("WAITPID 4 TRIPPED\n");
     // waitpid(-recent, &status, WUNTRACED);
     // if(errno == ECHILD){
@@ -1149,14 +1159,16 @@ void runBackground(JobNode_t** head){
   const int RUNNING = 0;
   const char CURRENT = '+';
 
-  int stoppedOnly = 1;
-  int recent = findRecent(head, stoppedOnly);
+  Job_t* recent = findRecentStopped(head);
+  int recentPGID = recent->pgid;
+  int recentJobID = recent->jobId;
+  char* recentStr = recent->jobStr;
 
-  if(recent != INVALID){
-    killpg(recent, SIGCONT);
-    changeJobStatus(head, recent, RUNNING);
-    addBGTok(head, recent);
-    printf("[%d]%c %s\n", (*jobStack)->jobId, CURRENT, (*jobStack)->jobStr);
+  if(recentPGID != INVALID){
+    killpg(recentPGID, SIGCONT);
+    changeJobStatus(head, recentPGID, RUNNING);
+    addBGTok(head, recentPGID);
+    printf("[%d]%c %s\n", recentJobID, CURRENT, recentStr);
   }
 
 	return;
@@ -1343,7 +1355,6 @@ void shell(void){
     } 
 
     if((*jobStack) != NULL){
-      checkDoneJobs(jobStack);
       printDoneJobs(jobStack);
       removeDoneJobs(jobStack);
     }
