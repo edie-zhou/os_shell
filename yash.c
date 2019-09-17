@@ -539,6 +539,21 @@ void removeJob(JobNode_t** head, int pgid){
   if(curr == NULL){
     return;
   }
+  else if(curr->job->pgid == pgid){
+    curr = curr->next;
+    temp = curr;
+
+    currJob = temp->job;
+    if(currJob != NULL){
+      if((currJob->jobStr) != NULL)
+        free(currJob->jobStr);
+      free(currJob);
+    }
+    if(temp != NULL)
+      free(temp);
+
+    return;
+  }
   temp = curr->next;
   currJob = curr->job;
   if(currJob->pgid == pgid){
@@ -555,8 +570,10 @@ void removeJob(JobNode_t** head, int pgid){
   }
   while(temp != NULL){
     currJob = temp->job;
+
     if(currJob->pgid == pgid){
-      curr->next = temp->next;
+      (*head)->next = temp->next;
+
       if(currJob != NULL){
         if(currJob->jobStr != NULL)
           free(currJob->jobStr);
@@ -585,27 +602,29 @@ void removeDoneJobs(JobNode_t** head){
   const int DONE = 2;
 
   JobNode_t* curr = *head;
-  JobNode_t* temp = curr->next;
+  JobNode_t* temp = NULL;
   Job_t* currJob = NULL;
 
-  
   if(curr->job != NULL){
     currJob = curr->job;
   }
 
   while((curr != NULL) && (currJob->status == DONE)){
-    currJob = curr->job;
-
+    temp = curr;
+    (*head) = curr->next;
+    curr = (*head);
+    
+    currJob = temp->job;
     if(currJob != NULL){
       if((currJob->jobStr) != NULL)
         free(currJob->jobStr);
+      free(currJob);
     }
-    if(curr != NULL)
-      free(curr);
+    if(temp != NULL)
+      free(temp);
 
-    curr = temp;
-    if(temp != NULL){
-      temp = temp->next;
+    if(curr != NULL){
+      temp = curr->next;
     }
   }
 
@@ -614,7 +633,7 @@ void removeDoneJobs(JobNode_t** head){
     return;
   }
   else{
-    *head = curr;
+    curr = (*head);
     temp = curr->next;
 
     while(temp != NULL){
@@ -635,7 +654,6 @@ void removeDoneJobs(JobNode_t** head){
       else{
         curr = temp;
         temp = temp->next;
-    
       }
     }
 
@@ -727,7 +745,8 @@ static void sigchldHandler(int sigNum){
       existsInStack = findID(jobStack, waitRet);
 	    if(existsInStack){
         changeJobStatus(jobStack, waitRet, DONE);
-        removeJob(jobStack, waitRet);
+        if(isInFG(jobStack, waitRet))
+          removeJob(jobStack, waitRet);
       }
     }
     else if (WIFSIGNALED(status)) {
@@ -1123,15 +1142,15 @@ void runForeground(JobNode_t** head){
   printf("FG run!\n");
 
   if(recent != NULL){
-    if(signal(SIGINT, sigintHandler) == SIG_ERR){
-      printf("signal(SIGINT) error");
-    }
-    if(signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
-      printf("signal(SIGTSTP) error");
-    } 
-    if(signal(SIGCHLD, sigchldHandler) == SIG_ERR){
-      printf("signal(SIGCHLD) error");
-    }
+    // if(signal(SIGINT, sigintHandler) == SIG_ERR){
+    //   printf("signal(SIGINT) error");
+    // }
+    // if(signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
+    //   printf("signal(SIGTSTP) error");
+    // } 
+    // if(signal(SIGCHLD, sigchldHandler) == SIG_ERR){
+    //   printf("signal(SIGCHLD) error");
+    // }
 
     recentPGID = recent->pgid;
     printf("%s\n", recent->jobStr);
