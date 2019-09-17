@@ -932,6 +932,7 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
   const int IN_BG = 0;
 
   sigset_t set;
+  
   int pidCh1 = fork();
 
   if(pidCh1 < 0){
