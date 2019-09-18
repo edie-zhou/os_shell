@@ -1346,7 +1346,7 @@ void runBackground(JobNode_t** head){
   Job_t* recent = findRecentStopped(head);
   if(recent != NULL){
     recentPGID = recent->pgid;
-    printf("BG: %d", recentPGID);
+    // printf("BG: %d", recentPGID);
   }
   
   if(recentPGID != INVALID){
