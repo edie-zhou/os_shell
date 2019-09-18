@@ -48,6 +48,7 @@ typedef struct JobNode_t{
 }JobNode_t;
 
 JobNode_t** jobStack = NULL;
+int fgExist = 0;
 int pgrp = -1;
 char* fgProc;
 
@@ -730,19 +731,29 @@ static void sigtstpHandler(int sigNum){
  *   None
  */
 static void sigchldHandler(int sigNum){
+  if(signal(SIGINT, sigintHandler) == SIG_ERR){
+    printf("signal(SIGINT) error");
+  }
+  if(signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
+    printf("signal(SIGTSTP) error");
+  } 
+  if(signal(SIGCHLD, sigchldHandler) == SIG_ERR){
+    printf("signal(SIGCHLD) error");
+  } 
+
   const int STOPPED = 1;
   const int DONE = 2;
   const int IN_BG = 0;
   int status;
   int waitRet;
-  int existsInStack = 0;
+  int exists = 0;
 
   while ((waitRet = waitpid(-1, &status, WNOHANG | WUNTRACED)) > 0) {
     // Reaping function
     if (WIFEXITED(status)){
       // Child exited normally
-      existsInStack = findID(jobStack, waitRet);
-	    if(existsInStack){
+      exists = findID(jobStack, waitRet);
+	    if(exists){
         changeJobStatus(jobStack, waitRet, DONE);
         if(isInFG(jobStack, waitRet))
           removeJob(jobStack, waitRet);
@@ -750,14 +761,14 @@ static void sigchldHandler(int sigNum){
     }
     else if (WIFSIGNALED(status)) {
       // Child killed by signal
-      existsInStack = findID(jobStack, waitRet);
-	    if(existsInStack)
+      exists = findID(jobStack, waitRet);
+	    if(exists)
         removeJob(jobStack, waitRet);
     }
     else if (WIFSTOPPED(status)) {
       // Child stopped by signal
-      existsInStack = findID(jobStack, waitRet);
-      if(!existsInStack)
+      exists = findID(jobStack, waitRet);
+      if(!exists)
         pushNode(jobStack, fgProc, waitRet, STOPPED, IN_BG);
       else
         changeJobStatus(jobStack, waitRet, STOPPED);
@@ -1005,11 +1016,16 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
   // TODO: Change execvp to execvpe
   const int MAX_LINE_LEN = 2001;
   const int RUNNING = 0;
+  const int STOPPED = 1;
+  const int DONE = 2;
+
   const int IN_FG = 1;
   const int IN_BG = 0;
+  
+  int status;
+  int exists = 0;
 
   int pidCh1 = fork();
-  sigset_t set;
 
   if(pidCh1 < 0){
     // fork failed; exit
@@ -1036,7 +1052,30 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
     pushNode(head, input, pidCh1, RUNNING, IN_FG);
 
     // wait for signal
-    sigsuspend(&set);
+    waitpid(pidCh1, &status, WCONTINUED | WUNTRACED);
+    if (WIFEXITED(status)){
+      // Child exited normally
+      exists = findID(jobStack, pidCh1);
+	    if(exists){
+        changeJobStatus(jobStack, pidCh1, DONE);
+        if(isInFG(jobStack, pidCh1))
+          removeJob(jobStack, pidCh1);
+      }
+    }
+    else if (WIFSIGNALED(status)) {
+      // Child killed by signal
+      exists = findID(jobStack, pidCh1);
+	    if(exists)
+        removeJob(jobStack, pidCh1);
+    }
+    else if (WIFSTOPPED(status)) {
+      // Child stopped by signal
+      exists = findID(jobStack, pidCh1);
+      if(!exists)
+        pushNode(jobStack, fgProc, pidCh1, STOPPED, IN_BG);
+      else
+        changeJobStatus(jobStack, pidCh1, STOPPED);
+    }
     return;
   }
   else{
@@ -1063,13 +1102,18 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
 void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int back){
   const int MAX_LINE_LEN = 2001;
   const int RUNNING = 0;
+  const int STOPPED = 1;
+  const int DONE = 2;
+
   const int IN_FG = 1;
   const int IN_BG = 0;
+  
+  int status;
+  int exists = 0;
 
   int pidCh1;
   int pidCh2;
   int pfd[2];
-  sigset_t set;
 
   pipe(pfd);
   pidCh1 = fork();
@@ -1115,8 +1159,29 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
   if(!back){
     pushNode(head, input, pidCh1, RUNNING, IN_FG);
 
-    // Wait for signal
-    sigsuspend(&set);
+    if(WIFEXITED(status)){
+      // Child exited normally
+      exists = findID(jobStack, pidCh1);
+	    if(exists){
+        changeJobStatus(jobStack, pidCh1, DONE);
+        if(isInFG(jobStack, pidCh1))
+          removeJob(jobStack, pidCh1);
+      }
+    }
+    else if(WIFSIGNALED(status)){
+      // Child killed by signal
+      exists = findID(jobStack, pidCh1);
+	    if(exists)
+        removeJob(jobStack, pidCh1);
+    }
+    else if(WIFSTOPPED(status)){
+      // Child stopped by signal
+      exists = findID(jobStack, pidCh1);
+      if(!exists)
+        pushNode(jobStack, fgProc, pidCh1, STOPPED, IN_BG);
+      else
+        changeJobStatus(jobStack, pidCh1, STOPPED);
+    }
     return;
   }
   else{
@@ -1136,23 +1201,30 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
  *   None
  */ 
 void runForeground(JobNode_t** head){
-  const int IN_FG = 1;
+  if(signal(SIGINT, sigintHandler) == SIG_ERR){
+    printf("signal(SIGINT) error");
+  }
+  if(signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
+    printf("signal(SIGTSTP) error");
+  } 
+  if(signal(SIGCHLD, sigchldHandler) == SIG_ERR){
+    printf("signal(SIGCHLD) error");
+  } 
+
   const int RUNNING = 0;
+  const int STOPPED = 1;
+  const int DONE = 2;
+
+  const int IN_FG = 1;
+  const int IN_BG = 0;
+  
+  int status;
+  int exists = 0;
   int recentPGID;
   Job_t* recent = findRecentBG(head);
   printf("FG run!\n");
 
   if(recent != NULL){
-    // if(signal(SIGINT, sigintHandler) == SIG_ERR){
-    //   printf("signal(SIGINT) error");
-    // }
-    // if(signal(SIGTSTP, sigtstpHandler) == SIG_ERR){
-    //   printf("signal(SIGTSTP) error");
-    // } 
-    // if(signal(SIGCHLD, sigchldHandler) == SIG_ERR){
-    //   printf("signal(SIGCHLD) error");
-    // }
-
     recentPGID = recent->pgid;
     tcsetpgrp(0, recentPGID); 
     printf("%s\n", recent->jobStr);
@@ -1162,13 +1234,32 @@ void runForeground(JobNode_t** head){
     kill(-recentPGID, SIGCONT);
 
     // wait for signal
-    int status;
-    waitpid(-1, &status, WCONTINUED | WUNTRACED);
-    waitpid(-1, &status, WCONTINUED | WUNTRACED);
-    if(!WIFSTOPPED(status)){
-      // printf("STOPPED\n");
+    waitpid(recentPGID, &status, WCONTINUED | WUNTRACED);
+    if (WIFEXITED(status)){
+      // Child exited normally
+      exists = findID(jobStack, recentPGID);
+	    if(exists){
+        changeJobStatus(jobStack, recentPGID, DONE);
+        if(isInFG(jobStack, recentPGID))
+          removeJob(jobStack, recentPGID);
+      }
+      removeJob(head, recentPGID);
     }
-    removeJob(head, recentPGID);
+    else if (WIFSIGNALED(status)) {
+      // Child killed by signal
+      exists = findID(jobStack, recentPGID);
+	    if(exists)
+        removeJob(jobStack, recentPGID);
+      removeJob(head, recentPGID);
+    }
+    else if (WIFSTOPPED(status)) {
+      // Child stopped by signal
+      exists = findID(jobStack, recentPGID);
+      if(!exists)
+        pushNode(jobStack, fgProc, recentPGID, STOPPED, IN_BG);
+      else
+        changeJobStatus(jobStack, recentPGID, STOPPED);
+    }
     tcsetpgrp(0, getpid()); 
   }
 	return;
