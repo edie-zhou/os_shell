@@ -93,7 +93,7 @@ void popStr(StrNode_t** head){
 
   temp = (*head)->next;
   if((*head)->jobStr != NULL){
-    // printf("%s", (*head)->jobStr);
+    printf("%s", (*head)->jobStr);
     free((*head)->jobStr);
   }
   free(*head);
