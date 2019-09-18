@@ -765,7 +765,7 @@ static void sigchldHandler(int sigNum){
     printf("SIGCHLD on pgrp: %d\n", pgrp);
   }
 
-  signal(SIGCHLD, sigchldHandler);
+  // signal(SIGCHLD, sigchldHandler);
 }
 
 /** 
@@ -1136,6 +1136,8 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
  *   None
  */ 
 void runForeground(JobNode_t** head){
+  const int IN_FG = 1;
+  const int RUNNING = 0;
   int recentPGID;
   Job_t* recent = findRecentBG(head);
   printf("FG run!\n");
@@ -1152,15 +1154,22 @@ void runForeground(JobNode_t** head){
     // }
 
     recentPGID = recent->pgid;
+    tcsetpgrp(0, recentPGID); 
     printf("%s\n", recent->jobStr);
     printf("FG: %d\n", recentPGID);
-    removeJob(head, recentPGID);
+    changeJobStatus(head, recentPGID, RUNNING);
+    changeJobFGState(head, recentPGID, IN_FG);
     kill(-recentPGID, SIGCONT);
 
     // wait for signal
     int status;
     waitpid(-1, &status, WCONTINUED | WUNTRACED);
     waitpid(-1, &status, WCONTINUED | WUNTRACED);
+    if(!WIFSTOPPED(status)){
+      // printf("STOPPED\n");
+    }
+    removeJob(head, recentPGID);
+    tcsetpgrp(0, getpid()); 
   }
 	return;
 }
