@@ -18,8 +18,7 @@
 
 // TODO: Refactor into several .c and .h files, separating read, parse, and
 //       execute would be a good place to start
-
-// TODO: FG WON'T HANG ON TO TERMINAL
+// haha I'm sorry about this
 
 typedef struct StrNode_t{
   char* jobStr;
@@ -94,7 +93,7 @@ void popStr(StrNode_t** head){
 
   temp = (*head)->next;
   if((*head)->jobStr != NULL){
-    printf("%s", (*head)->jobStr);
+    // printf("%s", (*head)->jobStr);
     free((*head)->jobStr);
   }
   free(*head);
@@ -342,7 +341,7 @@ Job_t* findFGProc(JobNode_t** head){
   while(curr != NULL){
 
     currJob = curr->job;
-    printf("findFGProc: %d\n", currJob->inFG);
+    // printf("findFGProc: %d\n", currJob->inFG);
     if(currJob->inFG){
       return currJob;
     }
@@ -707,7 +706,7 @@ static void sigintHandler(int sigNum){
 
 	if(fgJob != NULL){
     pgrp = fgJob->pgid;
-    printf("SIGINT: %d\n", pgrp);
+    // printf("SIGINT: %d\n", pgrp);
     killpg(pgrp, SIGINT);
 	}
   else{
@@ -730,15 +729,14 @@ static void sigintHandler(int sigNum){
  *   None
  */
 static void sigtstpHandler(int sigNum){
-  // TODO: Fix Ctrl+Z double prompt print bug
   const int IN_BG = 0;
   const char* PROMPT = "# ";
   Job_t* fgJob = findFGProc(jobStack);
-  printf("TSTP Handler run!\n");
+  // printf("TSTP Handler run!\n");
 
 	if(fgJob != NULL){
     pgrp = fgJob->pgid;
-    printf("SIGTSTP: %d\n", pgrp);
+    // printf("SIGTSTP: %d\n", pgrp);
     changeJobFGState(jobStack, pgrp, IN_BG);
     kill(-pgrp, SIGTSTP);
 	}
@@ -803,7 +801,7 @@ static void sigchldHandler(int sigNum){
       else
         changeJobStatus(jobStack, waitRet, STOPPED);
     }
-    printf("SIGCHLD on pgrp: %d\n", pgrp);
+    // printf("SIGCHLD on pgrp: %d\n", pgrp);
   }
 
   // signal(SIGCHLD, sigchldHandler);
@@ -1043,7 +1041,6 @@ void redirectFile(char** cmd){
  *   None
  */
 void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
-  // TODO: Change execvp to execvpe
   const int MAX_LINE_LEN = 2001;
   const int RUNNING = 0;
   const int STOPPED = 1;
@@ -1067,12 +1064,12 @@ void executeGeneral(char** cmd, char* input, JobNode_t** head, int back){
     redirectFile(cmd);
     execvp(cmd[0], cmd);
 
-    printf("\nEXEC PGID: %d\n", getpgid(0));
+    // printf("\nEXEC PGID: %d\n", getpgid(0));
     exit(EXIT_FAILURE);
   }
 
   // parent process
-  printf("EXEC PID: %d\n", pidCh1);
+  // printf("EXEC PID: %d\n", pidCh1);
   if(fgProc != NULL)
     free(fgProc);
 
@@ -1255,14 +1252,12 @@ void runForeground(JobNode_t** head){
   
   Job_t* recent = findRecentStopBG(head);
   fromFG = 1;
-  printf("FG run!\n");
+  // printf("FG run!\n");
 
   if(recent != NULL){
-    printf("FG nut!\n");
     recentPGID = recent->pgid;
     // tcsetpgrp(0, recentPGID); 
-    printf("%s\n", recent->jobStr);
-    printf("FG: %d\n", recentPGID);
+    // printf("%s\nFG: %d\n", recent->jobStr, recentPGID);
     changeJobStatus(head, recentPGID, RUNNING);
     changeJobFGState(head, recentPGID, IN_FG);
     kill(-recentPGID, SIGCONT);
