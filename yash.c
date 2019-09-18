@@ -49,6 +49,7 @@ typedef struct JobNode_t{
 
 JobNode_t** jobStack = NULL;
 int fgExist = 0;
+int fromFG = 0;
 int pgrp = -1;
 char* fgProc;
 
@@ -278,6 +279,35 @@ Job_t* findRecentBG(JobNode_t** head){
  * Returns:
  *   (Job_t*): Pointer to most recent stopped job
  */ 
+Job_t* findRecentStopBG(JobNode_t** head){
+  const int STOPPED_VAL = 1;
+  const int DONE_VAL = 2;
+
+  JobNode_t* curr = *head;
+  Job_t* currJob = NULL;
+
+  while(curr != NULL){
+    currJob = curr->job;
+    if((currJob->status == STOPPED_VAL) ||
+       ((currJob->status != DONE_VAL) && !(currJob->inFG))){
+      return currJob;
+    }
+    curr = curr->next;
+  }
+
+  return NULL;
+}
+
+/**
+ * Purpose:
+ *   Find most recent stopped job
+ * 
+ * Args:
+ *   head (JobNode_t**): Pointer to job stack head pointer
+ * 
+ * Returns:
+ *   (Job_t*): Pointer to most recent stopped job
+ */ 
 Job_t* findRecentStopped(JobNode_t** head){
   const int STOPPED_VAL = 1;
 
@@ -286,7 +316,7 @@ Job_t* findRecentStopped(JobNode_t** head){
 
   while(curr != NULL){
     currJob = curr->job;
-    if((currJob->status == STOPPED_VAL) && !(currJob->inFG)){
+    if(currJob->status == STOPPED_VAL){
       return currJob;
     }
     curr = curr->next;
@@ -1222,12 +1252,15 @@ void runForeground(JobNode_t** head){
   int status;
   int exists = 0;
   int recentPGID;
-  Job_t* recent = findRecentBG(head);
+  
+  Job_t* recent = findRecentStopBG(head);
+  fromFG = 1;
   printf("FG run!\n");
 
   if(recent != NULL){
+    printf("FG nut!\n");
     recentPGID = recent->pgid;
-    tcsetpgrp(0, recentPGID); 
+    // tcsetpgrp(0, recentPGID); 
     printf("%s\n", recent->jobStr);
     printf("FG: %d\n", recentPGID);
     changeJobStatus(head, recentPGID, RUNNING);
@@ -1261,7 +1294,7 @@ void runForeground(JobNode_t** head){
       else
         changeJobStatus(jobStack, recentPGID, STOPPED);
     }
-    tcsetpgrp(0, getpid()); 
+    // tcsetpgrp(0, getpid()); 
   }
 	return;
 }
@@ -1287,7 +1320,9 @@ void printBGStr(JobNode_t** head, int pgid){
   while(curr != NULL){
     currJob = curr->job;
     if(currJob->pgid == pgid){
-      strcat(currJob->jobStr, BG_TOK);
+      if(!fromFG){
+        strcat(currJob->jobStr, BG_TOK);
+      }
       printf("[%d]%c %s\n", currJob->jobId, CURRENT, currJob->jobStr);
       return;
     }
@@ -1316,8 +1351,9 @@ void runBackground(JobNode_t** head){
   Job_t* recent = findRecentStopped(head);
   if(recent != NULL){
     recentPGID = recent->pgid;
+    printf("BG: %d", recentPGID);
   }
-
+  
   if(recentPGID != INVALID){
     printBGStr(head, recentPGID);
     changeJobStatus(head, recentPGID, RUNNING);
@@ -1388,6 +1424,7 @@ void manageJobs(char** cmd, char* input, JobNode_t** head){
   else{
     // execute normally
     backState = 0;
+    fromFG = 0;
     executeGeneral(cmd, input, head, backState);
 
     return;
@@ -1454,6 +1491,7 @@ void managePipeJobs(char** cmd1, char** cmd2, char* input, JobNode_t** head){
   else{
     // execute normally
     backState = 0;
+    fromFG = 0;
     executePipe(cmd1, cmd2, input, head, backState);
     
     return;
@@ -1493,7 +1531,7 @@ void shell(void){
   // Reset pgrp
   fgProc = (char*)malloc(MAX_LINE_LEN * sizeof(char));
 
-  while(input = readline(PROMPT)){
+  while((input = readline(PROMPT))){
     if(signal(SIGINT, sigintHandler) == SIG_ERR){
       printf("signal(SIGINT) error");
     }
