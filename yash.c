@@ -1159,6 +1159,7 @@ void executePipe(char** cmd1, char** cmd2, char* input, JobNode_t** head, int ba
   if(!back){
     pushNode(head, input, pidCh1, RUNNING, IN_FG);
 
+    waitpid(pidCh1, &status, WCONTINUED | WUNTRACED);
     if(WIFEXITED(status)){
       // Child exited normally
       exists = findID(jobStack, pidCh1);
