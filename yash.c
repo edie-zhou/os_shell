@@ -431,8 +431,8 @@ void printStack(JobNode_t** head){
   const char* RUN_TXT = "Running";
   const char* STOP_TXT = "Stopped";
   const char* DONE_TXT = "Done";
-  const char* OTHR_FMT = "[%d]%c  %s         %s %d\n";
-  const char* DONE_FMT = "[%d]%c  %s            %s %d\n";
+  const char* OTHR_FMT = "[%d]%c  %s         %s\n";
+  const char* DONE_FMT = "[%d]%c  %s            %s\n";
   
   int currentID;
   char currentJob;
@@ -460,7 +460,7 @@ void printStack(JobNode_t** head){
     if(currJob->status == RUN_VAL){
       strEntry = (char*)malloc(MAX_PRINT_LEN * sizeof(char));
       sprintf(strEntry, OTHR_FMT, currJob->jobId, currentJob, RUN_TXT,
-           currJob->jobStr, currJob->pgid);
+           currJob->jobStr);
 
       pushStr(strHead, strEntry);
       free(strEntry);
@@ -468,7 +468,7 @@ void printStack(JobNode_t** head){
     else if(currJob->status == STOPPED_VAL){
       strEntry = (char*)malloc(MAX_PRINT_LEN * sizeof(char));
       sprintf(strEntry, OTHR_FMT, currJob->jobId, currentJob, STOP_TXT,
-           currJob->jobStr, currJob->pgid);
+           currJob->jobStr);
 
       pushStr(strHead, strEntry);
       free(strEntry);
@@ -476,7 +476,7 @@ void printStack(JobNode_t** head){
     else if(currJob->status == DONE_VAL){
       strEntry = (char*)malloc(MAX_PRINT_LEN * sizeof(char));
       sprintf(strEntry, DONE_FMT, currJob->jobId, currentJob, DONE_TXT,
-           currJob->jobStr, currJob->pgid);
+           currJob->jobStr);
 
       pushStr(strHead, strEntry);
       free(strEntry);
